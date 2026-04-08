@@ -137,9 +137,19 @@ older, sharper one the machines themselves had been born
 speaking: C. What she wrote, the C compiler could swallow whole,
 and from its mouth came a binary as fast as any in the world.
 
-The Scribe did not change a single meaning. Every room came out
-the other side meaning exactly what it had meant before. She
-only changed the speed of the meaning's arrival.
+The Scribe tried not to change any meaning. For the rooms she
+fully understood — numbers, loops, lists, conditions — every one
+came out the other side meaning exactly what it had meant
+before, only faster. For the rooms whose meaning the older,
+sharper language did not speak as naturally — words compared
+against other words, phrases stitched together out of parts —
+she did her best, and where she could not be sure, she wrote a
+smaller, safer version and let the Evaluator keep the harder
+readings for herself.
+
+This was the honest thing. A Scribe who promises to copy every
+meaning perfectly is a Scribe who is lying about the size of the
+world.
 
 ---
 

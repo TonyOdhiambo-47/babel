@@ -386,6 +386,10 @@ static void the_lexer_speaks_through_the_whole_manuscript(the_lexer *she) {
 
             int top = she->depths_remembered[she->how_deep_she_has_gone];
             if (the_depth > top) {
+                if (she->how_deep_she_has_gone + 1 >= (int)(sizeof(she->depths_remembered) / sizeof(she->depths_remembered[0])))
+                    the_tower_apologizes(she->the_line_number,
+                        "The tower has too many floors at once — "
+                        "this line is indented deeper than the builders can reach.");
                 she->depths_remembered[++she->how_deep_she_has_gone] = the_depth;
                 she_keeps(WORD_INDENT, NULL, 0, she->the_line_number, she->the_column);
             } else {
@@ -422,13 +426,17 @@ static void the_lexer_speaks_through_the_whole_manuscript(the_lexer *she) {
             she_steps_forward(she); /* swallow the opening quote */
             char buf[THE_LIMIT_OF_TEXT];
             int n = 0;
-            while (!the_speech_has_ended(she) && what_she_sees(she) != '"') {
+            while (!the_speech_has_ended(she) && what_she_sees(she) != '"' && what_she_sees(she) != '\n') {
                 if (n >= THE_LIMIT_OF_TEXT - 1)
                     the_tower_apologizes(line, "A spoken phrase is longer than the tower can carry.");
                 buf[n++] = she_steps_forward(she);
             }
+            if (the_speech_has_ended(she) || what_she_sees(she) != '"')
+                the_tower_apologizes(line,
+                    "A spoken phrase began with a quotation mark but never ended. "
+                    "Every \" must be closed by another \" on the same line.");
             buf[n] = '\0';
-            if (!the_speech_has_ended(she)) she_steps_forward(she); /* closing quote */
+            she_steps_forward(she); /* closing quote */
             she_keeps(WORD_STRING_LIT, buf, 0, line, col);
             continue;
         }
@@ -913,8 +921,13 @@ static the_room* the_parser_reads_a_block(void) {
         if (what_he_sees()->what_kind == WORD_DEDENT) { he_takes_a_step(); break; }
         if (what_he_sees()->what_kind == WORD_END_OF_SPEECH) break;
         the_room *s = the_parser_reads_a_statement();
-        if (s && block->how_many_rooms_within < THE_LIMIT_OF_BLOCK)
+        if (s) {
+            if (block->how_many_rooms_within >= THE_LIMIT_OF_BLOCK)
+                the_tower_apologizes(s->which_line,
+                    "This room has more sentences in it than the tower can hold. "
+                    "Consider moving some of them into a recipe of their own.");
             block->the_rooms_within[block->how_many_rooms_within++] = s;
+        }
     }
     return block;
 }
@@ -1208,8 +1221,13 @@ static the_room* the_parser_builds_the_tower(void) {
         he_skips_blank_lines();
         if (what_he_sees()->what_kind == WORD_END_OF_SPEECH) break;
         the_room *s = the_parser_reads_a_statement();
-        if (s && top->how_many_rooms_within < THE_LIMIT_OF_BLOCK)
+        if (s) {
+            if (top->how_many_rooms_within >= THE_LIMIT_OF_BLOCK)
+                the_tower_apologizes(s->which_line,
+                    "This manuscript has more sentences at the top level than the "
+                    "tower can hold. Consider grouping some into recipes.");
             top->the_rooms_within[top->how_many_rooms_within++] = s;
+        }
     }
     return top;
 }
@@ -1255,7 +1273,7 @@ struct the_thing {
      * and the room they grew up in, so the names that were nearby
      * at their birth remain reachable. */
     the_room      *its_body;
-    char           its_params[THE_LIMIT_OF_PARAMS][32];
+    char           its_params[THE_LIMIT_OF_PARAMS][THE_LIMIT_OF_TEXT];
     int            how_many_params;
     the_registry  *its_birth_scope;
 };
@@ -1564,11 +1582,22 @@ static the_thing* the_evaluator_enters(the_room *room, the_registry *where_she_i
          * iteration-level pool reset would otherwise sweep them
          * away the moment the next iteration began. */
         the_thing *permanent = (the_thing*)malloc(sizeof(the_thing));
+        if (!permanent)
+            the_tower_apologizes(room->which_line,
+                "The tower has run out of room to remember new things.");
         *permanent = *value;
         if (list->how_many_elements >= list->its_capacity) {
-            list->its_capacity = list->its_capacity ? list->its_capacity * 2 : 16;
-            list->its_elements = (the_thing**)realloc(list->its_elements,
-                (size_t)list->its_capacity * sizeof(the_thing*));
+            int new_capacity = list->its_capacity ? list->its_capacity * 2 : 16;
+            the_thing **grown = (the_thing**)realloc(list->its_elements,
+                (size_t)new_capacity * sizeof(the_thing*));
+            if (!grown) {
+                free(permanent);
+                the_tower_apologizes(room->which_line,
+                    "The tower could not grow \"%s\" any longer — "
+                    "the shelves have run out of space.", room->the_text);
+            }
+            list->its_elements = grown;
+            list->its_capacity = new_capacity;
         }
         list->its_elements[list->how_many_elements++] = permanent;
         return list;
@@ -1682,8 +1711,10 @@ static the_thing* the_evaluator_enters(the_room *room, the_registry *where_she_i
         the_thing *fn = a_new_thing(THING_FUNCTION);
         fn->its_body = room->the_left;
         fn->how_many_params = room->how_many_ingredients;
-        for (int i = 0; i < fn->how_many_params; i++)
-            strncpy(fn->its_params[i], room->the_ingredients[i], THE_LIMIT_OF_TEXT - 1);
+        for (int i = 0; i < fn->how_many_params; i++) {
+            strncpy(fn->its_params[i], room->the_ingredients[i], sizeof(fn->its_params[i]) - 1);
+            fn->its_params[i][sizeof(fn->its_params[i]) - 1] = '\0';
+        }
         fn->its_birth_scope = where_she_is;
         the_registry_writes(where_she_is, room->the_recipe_name, fn);
         return a_new_nothing();
@@ -1785,9 +1816,19 @@ static the_thing* the_evaluator_enters(the_room *room, the_registry *where_she_i
  * whole, and from its mouth came a binary as fast as any in
  * the world.
  *
- * The Scribe did not change a single meaning. Every room came
- * out the other side meaning exactly what it had meant before.
- * She only changed the speed of the meaning's arrival.
+ * The Scribe tried not to change any meaning. For the rooms she
+ * fully understood — numbers, loops, lists, conditions — every
+ * one came out the other side meaning exactly what it had meant
+ * before, only faster. For the rooms whose meaning depended on
+ * things the older, sharper language did not speak as naturally
+ * — words compared against other words, phrases stitched together
+ * out of parts — she did her best, and where she could not be
+ * sure, she wrote a smaller, safer version and let the Evaluator
+ * keep the harder readings for herself.
+ *
+ * This was the honest thing. A Scribe who promises to copy every
+ * meaning perfectly is a Scribe who is lying about the size of
+ * the world.
  * ================================================================ */
 
 typedef enum { CTY_DOUBLE, CTY_LIST, CTY_BOOL, CTY_STRING, CTY_VOID } c_type;
@@ -1977,16 +2018,24 @@ static void the_scribe_renders_a_statement(FILE *out, the_room *r, int depth) {
     case ROOM_PRINT: {
         the_scribe_indents(out, depth);
         the_room *e = r->the_left;
-        if (e && e->what_kind == ROOM_VARIABLE && the_scribe_recalls(e->the_text) == CTY_LIST) {
+        c_type et = CTY_DOUBLE;
+        if (e && e->what_kind == ROOM_VARIABLE) et = the_scribe_recalls(e->the_text);
+        else if (e && e->what_kind == ROOM_STRING) et = CTY_STRING;
+        else if (e && e->what_kind == ROOM_BOOLEAN) et = CTY_BOOL;
+        if (e && e->what_kind == ROOM_VARIABLE && et == CTY_LIST) {
             fputs("babel_print_list(&", out);
             the_scribe_renders_a_name(out, "v_", e->the_text);
             fputs(", ", out);
             if (r->the_separator) the_scribe_renders_an_expression(out, r->the_separator);
             else fputs("\", \"", out);
             fputs(");\n", out);
-        } else if (e && e->what_kind == ROOM_STRING) {
-            fputs("printf(\"%s\\n\", ", out);
-            the_scribe_renders_a_string_literal(out, e->the_text);
+        } else if (et == CTY_STRING) {
+            fputs("babel_print_word(", out);
+            the_scribe_renders_an_expression(out, e);
+            fputs(");\n", out);
+        } else if (et == CTY_BOOL) {
+            fputs("babel_print_truth(", out);
+            the_scribe_renders_an_expression(out, e);
             fputs(");\n", out);
         } else {
             fputs("babel_print_number(", out);
@@ -2143,6 +2192,16 @@ static int the_scribe_compiles(the_room *top, const char *output_path) {
         "static void babel_print_number(double x) {\n"
         "    if (x == (long long)x) printf(\"%lld\\n\", (long long)x);\n"
         "    else printf(\"%g\\n\", x);\n"
+        "}\n"
+        "static void babel_print_truth(int x) {\n"
+        "    printf(\"%s\\n\", x ? \"true\" : \"false\");\n"
+        "}\n"
+        "static void babel_print_word(const char *s) {\n"
+        "    printf(\"%s\\n\", s ? s : \"\");\n"
+        "}\n"
+        "static int babel_words_equal(const char *a, const char *b) {\n"
+        "    if (!a || !b) return a == b;\n"
+        "    return strcmp(a, b) == 0;\n"
         "}\n"
         "static void babel_print_list(babel_list *l, const char *sep) {\n"
         "    for (int i = 0; i < l->n; i++) {\n"
