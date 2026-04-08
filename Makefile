@@ -13,7 +13,13 @@ run: babel
 repl: babel
 	./babel
 
+# Start a REPL that runs the Interpreter of Tongues in front of
+# the tower — you can speak however you like and she will
+# translate for the parser.
+friendly: babel
+	./babel -i
+
 clean:
 	rm -f babel a.out
 
-.PHONY: all run repl clean
+.PHONY: all run repl friendly clean
