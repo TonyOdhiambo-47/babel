@@ -3,3 +3,20 @@ For every n from 1 to 15, do the following:
     Otherwise, if n is divisible by 3, say "Fizz".
     Otherwise, if n is divisible by 5, say "Buzz".
     Otherwise, say n.
+
+# Expected output:
+# 1
+# 2
+# Fizz
+# 4
+# Buzz
+# Fizz
+# 7
+# 8
+# Fizz
+# Buzz
+# 11
+# Fizz
+# 13
+# 14
+# FizzBuzz

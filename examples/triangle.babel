@@ -15,3 +15,19 @@ For every row from 1 to 5, do the following:
     For every star from 1 to 2 times row minus 1, do the following:
         Set "line" to line plus "*".
     Say line.
+
+# Expected output:
+# A triangle of stars, built one row at a time:
+# *
+# **
+# ***
+# ****
+# *****
+# ******
+# *******
+# And a little pyramid, centered with spaces:
+#     *
+#    ***
+#   *****
+#  *******
+# *********

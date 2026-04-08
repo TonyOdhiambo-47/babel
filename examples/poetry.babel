@@ -12,3 +12,11 @@ Print the length of stars.
 Say "of them, hidden in the first hundred numbers,".
 Say "like stars in a city sky —".
 Say "invisible until you learn to look.".
+
+# Expected output:
+# Those are the primes.
+# There are
+# 25
+# of them, hidden in the first hundred numbers,
+# like stars in a city sky —
+# invisible until you learn to look.

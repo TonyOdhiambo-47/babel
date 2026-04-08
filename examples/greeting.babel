@@ -2,3 +2,6 @@ Let there be a word called "name" that equals "world".
 Let there be a word called "opener" that equals "Hello, ".
 Let there be a word called "message" that equals opener plus name plus "!".
 Say message.
+
+# Expected output:
+# Hello, world!

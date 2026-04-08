@@ -7,3 +7,18 @@ To primality with n, do the following:
 Say "The primes between 2 and 40, chosen one by one:".
 For every candidate from 2 to 40, do the following:
     If primality with candidate equals true, print candidate.
+
+# Expected output:
+# The primes between 2 and 40, chosen one by one:
+# 2
+# 3
+# 5
+# 7
+# 11
+# 13
+# 17
+# 19
+# 23
+# 29
+# 31
+# 37

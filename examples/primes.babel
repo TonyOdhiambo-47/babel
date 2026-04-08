@@ -7,3 +7,6 @@ For every candidate from 2 to 100, do the following:
     If looks prime equals true, remember candidate as primes.
 
 Print primes, separated by ", ".
+
+# Expected output:
+# 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97

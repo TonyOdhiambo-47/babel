@@ -12,3 +12,8 @@ For every candidate from 2 to 500, do the following:
 Say "A perfect number is one whose proper divisors add up to itself.".
 Say "The perfect numbers below 500 are:".
 Print perfects, separated by ", ".
+
+# Expected output:
+# A perfect number is one whose proper divisors add up to itself.
+# The perfect numbers below 500 are:
+# 6, 28, 496

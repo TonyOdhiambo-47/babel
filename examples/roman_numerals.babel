@@ -56,3 +56,34 @@ Print roman with 1776.
 Print roman with 1984.
 Print roman with 2024.
 Print roman with 3999.
+
+# Expected output:
+# The first twenty numbers, dressed in their Roman clothes:
+# I
+# II
+# III
+# IV
+# V
+# VI
+# VII
+# VIII
+# IX
+# X
+# XI
+# XII
+# XIII
+# XIV
+# XV
+# XVI
+# XVII
+# XVIII
+# XIX
+# XX
+# And a few larger ones:
+# XLIX
+# XCIX
+# CDXLIV
+# MDCCLXXVI
+# MCMLXXXIV
+# MMXXIV
+# MMMCMXCIX

@@ -13,3 +13,9 @@ Say "The five scores are:".
 Print scores, separated by ", ".
 Say "Their average is:".
 Print average.
+
+# Expected output:
+# The five scores are:
+# 85, 92, 78, 90, 88
+# Their average is:
+# 86.6

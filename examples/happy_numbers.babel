@@ -24,3 +24,9 @@ For every candidate from 1 to 50, do the following:
     If is_happy with candidate equals true, remember candidate as happies.
 
 Print happies, separated by ", ".
+
+# Expected output:
+# A happy number is one that eventually reaches 1 when you
+# repeatedly replace it with the sum of the squares of its digits.
+# The happy numbers below 50:
+# 1, 7, 10, 13, 19, 23, 28, 31, 32, 44, 49

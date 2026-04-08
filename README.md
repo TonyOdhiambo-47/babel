@@ -72,6 +72,15 @@ It still compiles with plain `cc`. It's just that when you open it, you get a st
 
 This is a stylistic experiment, not a claim that literate programming is the right way to write compilers. I wrote it this way because I wanted to, and because it forced me to think harder about naming.
 
+## Documentation
+
+Full docs live in the `docs/` folder:
+
+- [`docs/getting-started.md`](docs/getting-started.md) — build, run, first program, REPL.
+- [`docs/language.md`](docs/language.md) — the complete language reference.
+- [`docs/cookbook.md`](docs/cookbook.md) — short idiomatic snippets.
+- [`docs/gotchas.md`](docs/gotchas.md) — limitations and rough edges.
+
 ## Examples
 
 - `examples/hello.babel` — hello world

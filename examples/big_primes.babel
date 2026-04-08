@@ -7,3 +7,6 @@ For every candidate from 2 to 50000, do the following:
     If looks prime equals true, remember candidate as primes.
 
 Print the length of primes.
+
+# Expected output:
+# 5133

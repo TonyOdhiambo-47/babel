@@ -5,3 +5,11 @@ While n is greater than 0, do the following:
     Set n to n minus 1.
 
 Say "Liftoff!".
+
+# Expected output:
+# 5
+# 4
+# 3
+# 2
+# 1
+# Liftoff!
