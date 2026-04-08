@@ -1,6 +1,6 @@
 # Babel
 
-A programming language you already know how to read.
+Babel is a small language where the source code is structured English. Here's a program that prints the primes below 100:
 
 ```babel
 Let there be a list called "primes" that begins empty.
@@ -14,55 +14,56 @@ For every candidate from 2 to 100, do the following:
 Print primes, separated by ", ".
 ```
 
+Build and run it:
+
 ```
 $ make
 $ ./babel examples/primes.babel
 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97
 ```
 
-Or start a conversation:
+## Running programs
+
+There are three ways to run a Babel program.
+
+**Interpret it directly** — the default. Fastest to try, slowest to run.
 
 ```
-$ ./babel
+$ ./babel examples/primes.babel
 ```
 
-Or compile a Babel program to a native binary at the speed of `cc -O3`:
+**Compile it to a native binary** via C. Babel parses your program, emits equivalent C, and hands it to `cc -O3`. The result runs at the speed of compiled C.
 
 ```
 $ ./babel -c -o primes examples/primes.babel
 $ ./primes
 ```
 
-Or transcribe the same program into Python, so you can read it in
-a language you already know:
+**Transcribe it to Python.** Useful if you want to read what a Babel program actually does in a language you already know, or drop it into a larger Python project.
 
 ```
 $ ./babel -p -o primes.py examples/primes.babel
 $ python3 primes.py
 ```
 
-## What happens when you open `src/babel.c`
+**Start a REPL** by running `./babel` with no arguments.
 
-Read it.
+## About the source
 
-The whole compiler — lexer, parser, tree-walking evaluator, C
-code generator, Python transcriber, REPL — is written as a
-single, continuous short story about builders raising a tower
-out of words. Every identifier, every comment, every error
-message is part of the narrative. You can read it as a fable or
-you can read it as a working compiler. Both readings are
-correct. That was the point of the tower all along.
+The compiler is a single C file, `src/babel.c`. It's written so that the code and the comments together read as a short story about four builders — a Lexer, a Parser, an Evaluator, and a Scribe — raising a tower out of words. The identifiers follow the story, the comments narrate it, and the error messages are written in the same voice.
 
-The same story, without the C syntax, is in `STORY.md`.
+It still compiles with plain `cc`. It's just that when you open it, you get a story as well as a compiler. `STORY.md` has the same story with the C stripped out, if you just want to read the prose.
+
+This is a stylistic experiment, not a claim that literate programming is the right way to write compilers. I wrote it this way because I wanted to, and because it forced me to think harder about naming.
 
 ## Examples
 
-- `examples/hello.babel` — the smallest sentence
-- `examples/fizzbuzz.babel` — the oldest interview question
-- `examples/fibonacci.babel` — recursion
-- `examples/factorial.babel` — recursion, the friendly kind
-- `examples/primes.babel` — a list, a loop, a sieve
-- `examples/poetry.babel` — a program that is a poem that counts primes
+- `examples/hello.babel` — hello world
+- `examples/fizzbuzz.babel` — fizzbuzz
+- `examples/fibonacci.babel` — recursive fibonacci
+- `examples/factorial.babel` — recursive factorial
+- `examples/primes.babel` — the sieve above
+- `examples/poetry.babel` — a program whose source reads as a poem
 
 ## Tests
 
@@ -70,10 +71,7 @@ The same story, without the C syntax, is in `STORY.md`.
 $ tests/run_tests.sh
 ```
 
-Runs a small choir of unit programs through the evaluator, then
-puts the same examples through the Python transcription and
-checks both say the same thing. The tower should pass all of
-them.
+Runs a set of short programs through the interpreter and through the Python transcription, and checks that both produce the same output.
 
 ## Benchmarks
 
@@ -81,9 +79,7 @@ them.
 $ bench/run.sh
 ```
 
-Runs the same prime-counting program through four runners —
-the tree walker, the native C backend, the Python transcription,
-and a hand-written Python equivalent — and reports their times.
+Runs the same prime-counting program through four backends — the tree-walking interpreter, the native C binary, the Python transcription, and a hand-written Python equivalent — and prints how long each one took.
 
 ## Author
 
