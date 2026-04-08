@@ -168,3 +168,10 @@ if [ "$failed" -gt 0 ]; then
     exit 1
 fi
 echo "the tower stands."
+
+# And finally, a few questions for the Interpreter of Tongues,
+# so we know she is still hearing us.
+if [ -x tests/run_interpreter_tests.sh ]; then
+    echo
+    tests/run_interpreter_tests.sh
+fi
