@@ -1,0 +1,15 @@
+Let there be a list called "scores" that begins empty.
+Remember 85 as scores.
+Remember 92 as scores.
+Remember 78 as scores.
+Remember 90 as scores.
+Remember 88 as scores.
+
+Let there be a number called "total" that equals the sum of scores.
+Let there be a number called "count" that equals the length of scores.
+Let there be a number called "average" that equals total divided by count.
+
+Say "The five scores are:".
+Print scores, separated by ", ".
+Say "Their average is:".
+Print average.

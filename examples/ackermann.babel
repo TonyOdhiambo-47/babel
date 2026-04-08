@@ -1,0 +1,23 @@
+To ackermann with m and n, do the following:
+    If m equals 0, the answer is n plus 1.
+    If n equals 0, the answer is ackermann with m minus 1 and 1.
+    Let there be a number called "inner" that equals ackermann with m and n minus 1.
+    The answer is ackermann with m minus 1 and inner.
+
+Say "The Ackermann function grows very fast.".
+Say "A few modest values:".
+
+Say "A(0, 0):".
+Print ackermann with 0 and 0.
+
+Say "A(1, 1):".
+Print ackermann with 1 and 1.
+
+Say "A(2, 3):".
+Print ackermann with 2 and 3.
+
+Say "A(3, 3):".
+Print ackermann with 3 and 3.
+
+Say "A(3, 4):".
+Print ackermann with 3 and 4.

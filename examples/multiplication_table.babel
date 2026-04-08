@@ -1,0 +1,7 @@
+Say "The times tables, up to ten:".
+
+For every row from 1 to 10, do the following:
+    Let there be a list called "products" that begins empty.
+    For every col from 1 to 10, do the following:
+        Remember row times col as products.
+    Print products, separated by "   ".

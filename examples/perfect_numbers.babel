@@ -1,0 +1,14 @@
+To sum_of_divisors with n, do the following:
+    Let there be a number called "total" that equals 0.
+    For every d from 1 to n minus 1, do the following:
+        If n is divisible by d, set "total" to total plus d.
+    The answer is total.
+
+Let there be a list called "perfects" that begins empty.
+
+For every candidate from 2 to 500, do the following:
+    If sum_of_divisors with candidate equals candidate, remember candidate as perfects.
+
+Say "A perfect number is one whose proper divisors add up to itself.".
+Say "The perfect numbers below 500 are:".
+Print perfects, separated by ", ".

@@ -1,0 +1,10 @@
+To gcd with x and y, do the following:
+    If y equals 0, the answer is x.
+    The answer is gcd with y and x modulo y.
+
+Say "Greatest common divisors, by Euclid's method:".
+Print gcd with 48 and 18.
+Print gcd with 100 and 75.
+Print gcd with 1071 and 462.
+Print gcd with 17 and 5.
+Print gcd with 270 and 192.

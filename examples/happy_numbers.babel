@@ -1,0 +1,26 @@
+To square_of_digits with n, do the following:
+    Let there be a number called "left" that equals n.
+    Let there be a number called "total" that equals 0.
+    While left is greater than 0, do the following:
+        Let there be a number called "digit" that equals left modulo 10.
+        Set "total" to total plus digit times digit.
+        Let there be a number called "without_digit" that equals left minus digit.
+        Set "left" to without_digit divided by 10.
+    The answer is total.
+
+To is_happy with n, do the following:
+    Let there be a number called "current" that equals n.
+    While current is greater than 1, do the following:
+        If current equals 4, the answer is false.
+        Set "current" to square_of_digits with current.
+    The answer is true.
+
+Say "A happy number is one that eventually reaches 1 when you".
+Say "repeatedly replace it with the sum of the squares of its digits.".
+Say "The happy numbers below 50:".
+
+Let there be a list called "happies" that begins empty.
+For every candidate from 1 to 50, do the following:
+    If is_happy with candidate equals true, remember candidate as happies.
+
+Print happies, separated by ", ".

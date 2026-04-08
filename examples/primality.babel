@@ -1,0 +1,9 @@
+To primality with n, do the following:
+    If n is less than 2, the answer is false.
+    For every divisor from 2 to n minus 1, do the following:
+        If n is divisible by divisor, the answer is false.
+    The answer is true.
+
+Say "The primes between 2 and 40, chosen one by one:".
+For every candidate from 2 to 40, do the following:
+    If primality with candidate equals true, print candidate.

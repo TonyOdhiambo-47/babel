@@ -1,0 +1,10 @@
+Let there be a list called "leaps" that begins empty.
+
+For every year from 2000 to 2050, do the following:
+    If year is divisible by 400, remember year as leaps.
+    Otherwise, if year is not divisible by 100, if year is divisible by 4, remember year as leaps.
+
+Say "The leap years between 2000 and 2050, by the Gregorian rule:".
+Print leaps, separated by ", ".
+Say "How many of them in that span:".
+Print the length of leaps.

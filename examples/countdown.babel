@@ -1,0 +1,7 @@
+Let there be a number called "n" that equals 5.
+
+While n is greater than 0, do the following:
+    Print n.
+    Set n to n minus 1.
+
+Say "Liftoff!".

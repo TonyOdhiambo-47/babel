@@ -75,10 +75,24 @@ This is a stylistic experiment, not a claim that literate programming is the rig
 ## Examples
 
 - `examples/hello.babel` — hello world
+- `examples/greeting.babel` — word variables and concatenation
 - `examples/fizzbuzz.babel` — fizzbuzz
+- `examples/countdown.babel` — a `While` loop counting down to liftoff
 - `examples/fibonacci.babel` — recursive fibonacci
 - `examples/factorial.babel` — recursive factorial
 - `examples/primes.babel` — the sieve above
+- `examples/primality.babel` — a recipe that returns a truth
+- `examples/average.babel` — the sum and length of a list
+- `examples/multiplication_table.babel` — nested loops that build a grid
+- `examples/gcd.babel` — Euclid's algorithm as a recursive recipe
+- `examples/power.babel` — recursive exponentiation
+- `examples/collatz.babel` — a `While` loop tracing the 3n+1 sequence
+- `examples/perfect_numbers.babel` — recipes and loops finding perfect numbers
+- `examples/happy_numbers.babel` — digit arithmetic inside a nested recipe
+- `examples/leap_years.babel` — the Gregorian rule expressed as nested ifs
+- `examples/triangle.babel` — building up strings row by row
+- `examples/ackermann.babel` — a small witness to deep recursion
+- `examples/roman_numerals.babel` — a longer recipe converting numbers to Roman
 - `examples/poetry.babel` — a program whose source reads as a poem
 
 ## Tests

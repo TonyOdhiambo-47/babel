@@ -1,0 +1,16 @@
+Let there be a number called "n" that equals 27.
+Let there be a number called "steps" that equals 0.
+Let there be a list called "path" that begins empty.
+
+Remember n as path.
+
+While n is greater than 1, do the following:
+    If n is divisible by 2, set "n" to n divided by 2.
+    Otherwise, set "n" to 3 times n plus 1.
+    Remember n as path.
+    Set "steps" to steps plus 1.
+
+Say "The Collatz sequence starting at 27:".
+Print path, separated by ", ".
+Say "It reaches 1 after this many steps:".
+Print steps.

@@ -1,0 +1,58 @@
+To roman with num, do the following:
+    Let there be a word called "result" that equals "".
+    Let there be a number called "n" that equals num.
+
+    While n is greater than 999, do the following:
+        Set "result" to result plus "M".
+        Set "n" to n minus 1000.
+    While n is greater than 899, do the following:
+        Set "result" to result plus "CM".
+        Set "n" to n minus 900.
+    While n is greater than 499, do the following:
+        Set "result" to result plus "D".
+        Set "n" to n minus 500.
+    While n is greater than 399, do the following:
+        Set "result" to result plus "CD".
+        Set "n" to n minus 400.
+    While n is greater than 99, do the following:
+        Set "result" to result plus "C".
+        Set "n" to n minus 100.
+    While n is greater than 89, do the following:
+        Set "result" to result plus "XC".
+        Set "n" to n minus 90.
+    While n is greater than 49, do the following:
+        Set "result" to result plus "L".
+        Set "n" to n minus 50.
+    While n is greater than 39, do the following:
+        Set "result" to result plus "XL".
+        Set "n" to n minus 40.
+    While n is greater than 9, do the following:
+        Set "result" to result plus "X".
+        Set "n" to n minus 10.
+    While n is greater than 8, do the following:
+        Set "result" to result plus "IX".
+        Set "n" to n minus 9.
+    While n is greater than 4, do the following:
+        Set "result" to result plus "V".
+        Set "n" to n minus 5.
+    While n is greater than 3, do the following:
+        Set "result" to result plus "IV".
+        Set "n" to n minus 4.
+    While n is greater than 0, do the following:
+        Set "result" to result plus "I".
+        Set "n" to n minus 1.
+
+    The answer is result.
+
+Say "The first twenty numbers, dressed in their Roman clothes:".
+For every i from 1 to 20, do the following:
+    Print roman with i.
+
+Say "And a few larger ones:".
+Print roman with 49.
+Print roman with 99.
+Print roman with 444.
+Print roman with 1776.
+Print roman with 1984.
+Print roman with 2024.
+Print roman with 3999.

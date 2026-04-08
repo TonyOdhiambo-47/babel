@@ -1,0 +1,17 @@
+Say "A triangle of stars, built one row at a time:".
+
+For every row from 1 to 7, do the following:
+    Let there be a word called "line" that equals "".
+    For every col from 1 to row, do the following:
+        Set "line" to line plus "*".
+    Say line.
+
+Say "And a little pyramid, centered with spaces:".
+
+For every row from 1 to 5, do the following:
+    Let there be a word called "line" that equals "".
+    For every pad from 1 to 5 minus row, do the following:
+        Set "line" to line plus " ".
+    For every star from 1 to 2 times row minus 1, do the following:
+        Set "line" to line plus "*".
+    Say line.
