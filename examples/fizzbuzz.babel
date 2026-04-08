@@ -1,0 +1,5 @@
+For every n from 1 to 15, do the following:
+    If n is divisible by 15, say "FizzBuzz".
+    Otherwise, if n is divisible by 3, say "Fizz".
+    Otherwise, if n is divisible by 5, say "Buzz".
+    Otherwise, say n.

@@ -1,0 +1,8 @@
+To fibonacci with n, do the following:
+    If n is less than 2, the answer is n.
+    Let there be a number called "first" that equals fibonacci with n minus 1.
+    Let there be a number called "second" that equals fibonacci with n minus 2.
+    The answer is first plus second.
+
+For every i from 0 to 15, do the following:
+    Print fibonacci with i.

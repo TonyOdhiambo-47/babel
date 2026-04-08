@@ -1,0 +1,7 @@
+To factorial with n, do the following:
+    If n is less than 2, the answer is 1.
+    Let there be a number called "smaller" that equals factorial with n minus 1.
+    The answer is n times smaller.
+
+For every i from 1 to 10, do the following:
+    Print factorial with i.

@@ -1,0 +1,14 @@
+Let there be a list called "stars" that begins empty.
+
+For every candidate from 2 to 100, do the following:
+    Let there be a truth called "shines" that equals true.
+    For every divisor from 2 to candidate minus 1, do the following:
+        If candidate is divisible by divisor, set "shines" to false.
+    If shines equals true, remember candidate as stars.
+
+Say "Those are the primes.".
+Say "There are".
+Print the length of stars.
+Say "of them, hidden in the first hundred numbers,".
+Say "like stars in a city sky —".
+Say "invisible until you learn to look.".

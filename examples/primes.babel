@@ -1,0 +1,9 @@
+Let there be a list called "primes" that begins empty.
+
+For every candidate from 2 to 100, do the following:
+    Let there be a truth called "looks prime" that equals true.
+    For every tester from 2 to candidate minus 1, do the following:
+        If candidate is divisible by tester, set "looks prime" to false.
+    If looks prime equals true, remember candidate as primes.
+
+Print primes, separated by ", ".
