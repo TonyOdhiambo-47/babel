@@ -167,6 +167,71 @@ part to write.
 
 ---
 
+## Chapter Eight: The Interpreter of Tongues
+
+Not every traveler who arrived at the tower had learned to speak
+its language. Some had, but only a little. Some had heard the
+tower's grammar secondhand, and remembered the shape of it but
+not the exact words. Others simply spoke English the way people
+speak English when no one is grading them — loose, with filler,
+with ten different ways to mean the same thing.
+
+The tower was patient, but it was also strict. If you said
+*"show me the primes"* when it wanted *"Print primes"*, it would
+stop and apologize, and the traveler would have to guess what to
+try next.
+
+So the builders called for an Interpreter of Tongues.
+
+She sat at the gate of the tower with a small book. On one side
+of each page was a phrase a traveler might say. On the other
+side was the Babel word the tower was waiting for. *Show me* on
+the left, *Print* on the right. *Make a* on the left, *Let there
+be a* on the right. *Whenever* on the left, *If* on the right.
+The book was not large, but it covered the ways people tended to
+ask for the same thing.
+
+When a traveler spoke, she did not interrupt. She listened to
+the whole sentence, tore out the filler words — the *okay so*s
+and the *basically*s and the *please can you*s — and then walked
+through what was left, a phrase at a time, looking each one up
+in her book.
+
+She had one small trick for telling whether she had succeeded.
+When she thought she had a translation, she would whisper it to
+the tower and ask, very quietly, *would you have understood
+this?* The tower would try to build the sentence, but instead of
+stopping the world if something was wrong, it would simply
+whisper back *no*, and forget it had ever heard the attempt.
+The builders called this the *patient parse*, and it was the
+quietest conversation in the tower.
+
+With the patient parse she could sort her interpretations into
+three colours. **Green**, when the tower had said yes right
+away — she had understood perfectly. **Yellow**, when her book
+had done some translating and the result looked good but she
+could not be completely sure — she would ask the traveler to
+confirm. **Red**, when nothing she tried would parse — she
+would admit it, plainly, and ask the traveler to say it a
+different way.
+
+She never pretended to understand something she did not. That
+was the most important rule of her work. A confident wrong
+answer was worse than an honest *I don't know*.
+
+When all her interpretations were settled — the yellows
+confirmed, the reds resolved or skipped — she stitched the
+agreed-upon Babel back together and handed it to the tower, the
+way a translator might hand a letter to a king. The tower read
+it in its own strict voice, and the conversation continued.
+
+The Interpreter was not a replacement for the tower's grammar.
+She was a doorkeeper. The grammar was still the grammar. But the
+door was a little wider now, and travelers who had been afraid
+to approach could come in and speak.
+
+---
+
 ## Chapter Six: The Conversation
 
 And so the tower was complete. But it was not a monument. It was
