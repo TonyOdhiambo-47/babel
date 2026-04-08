@@ -48,6 +48,22 @@ $ python3 primes.py
 
 **Start a REPL** by running `./babel` with no arguments.
 
+**Speak loosely.** If you'd rather not memorize the exact Babel phrasing, run the Interpreter of Tongues in front of the tower with `./babel -i` (or `make friendly`). She accepts freeform English — *show me*, *make a*, *whenever*, *loop through*, and a few dozen other everyday phrases — translates them into Babel, shows you what she heard, asks for confirmation on anything she's not sure about, and then hands the result to the tower.
+
+```
+$ ./babel -i
+you> make a number called "x" that equals 7. show me x.
+
+  I think you mean:
+
+    ? Let there be a number called "x" that equals 7.
+    ? Print x.
+
+  correct? yes
+  correct? yes
+  7
+```
+
 ## About the source
 
 The compiler is a single C file, `src/babel.c`. It's written so that the code and the comments together read as a short story about four builders — a Lexer, a Parser, an Evaluator, and a Scribe — raising a tower out of words. The identifiers follow the story, the comments narrate it, and the error messages are written in the same voice.
