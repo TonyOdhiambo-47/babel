@@ -197,12 +197,32 @@ typedef struct {
     int         at_start_of_line;
 } the_lexer;
 
+/* When the Interpreter of Tongues (Chapter Eight) is testing a
+ * sentence to see if it is already valid Babel, she does not want
+ * the tower to stop building if it isn't — she just wants to know
+ * whether it would have stopped. These two little fields let her
+ * ask. When "the_tower_is_being_patient" is set, a would-be
+ * apology quietly longjmps back to her instead of calling exit().
+ * The Interpreter always remembers to turn patience off again
+ * before the real tower starts building. */
+static int     the_tower_is_being_patient = 0;
+static jmp_buf the_patient_jump;
+static char    the_last_quiet_apology[512];
+
 /* A long, kindly cry. When something cannot be understood, the
  * tower stops building and explains, in plain words, what went
  * wrong. The voice is meant to sound like a patient teacher,
  * never a scolding one. */
 static void the_tower_apologizes(int line, const char *why, ...) {
     va_list args;
+    if (the_tower_is_being_patient) {
+        /* The Interpreter is listening. We save the apology where
+         * she can read it later, and return control to her. */
+        va_start(args, why);
+        vsnprintf(the_last_quiet_apology, sizeof(the_last_quiet_apology), why, args);
+        va_end(args);
+        longjmp(the_patient_jump, 1);
+    }
     fprintf(stderr, "\n");
     fprintf(stderr, "  I'm sorry — something went wrong");
     if (line > 0) fprintf(stderr, " on line %d", line);
@@ -2543,6 +2563,657 @@ static int the_scribe_transcribes_into_python(the_room *top, const char *output_
 }
 
 /* ================================================================
+ * CHAPTER EIGHT: THE INTERPRETER OF TONGUES
+ *
+ * In the order of the story, this chapter comes last. In the
+ * order of the tower, it comes first. Before the Lexer, before
+ * the Parser, before any builder laid a brick, there was the
+ * gate. And at the gate stood the Interpreter of Tongues.
+ *
+ * She was not a builder. She could not lay bricks or draw plans
+ * or walk the finished floors finding truth. Her gift was older
+ * and simpler: she could listen to a stranger speak in their own
+ * tongue and find the Babel words hidden inside their meaning.
+ *
+ * She never assumed she understood. She always asked. That was
+ * her only rule, and it was the rule that kept the tower
+ * standing. A builder who does not ask will raise the wrong
+ * walls; an interpreter who does not ask will translate the
+ * wrong words; and the tower will fall either way.
+ *
+ * She carried a book. In it were the words travelers commonly
+ * used and the Babel words they most likely intended. The book
+ * was not complete — no book of translations ever is — but it
+ * covered the most common misunderstandings. She updated it
+ * whenever a new traveler taught her a new way of saying an old
+ * thing.
+ * ================================================================ */
+
+/* A single page in the Interpreter's book: what travelers tend
+ * to say, what Babel would say in its place, and a short note
+ * on why the translation is reasonable. */
+typedef struct {
+    const char *the_travelers_phrase;
+    const char *the_babel_phrase;
+    const char *her_reason;
+} a_page_in_the_book;
+
+static const a_page_in_the_book the_book_of_tongues[] = {
+    /* ---- Verbs of creation ---- */
+    {"make a",          "Let there be a",   "creating something new"},
+    {"create a",        "Let there be a",   "creating something new"},
+    {"define a",        "Let there be a",   "creating something new"},
+    {"declare a",       "Let there be a",   "creating something new"},
+    {"i want a",        "Let there be a",   "creating something new"},
+    {"i need a",        "Let there be a",   "creating something new"},
+    {"give me a",       "Let there be a",   "creating something new"},
+
+    /* ---- Verbs of display ---- */
+    {"show me",         "Print",            "displaying output"},
+    {"show",            "Print",            "displaying output"},
+    {"display",         "Print",            "displaying output"},
+    {"tell me",         "Print",            "displaying output"},
+    {"what is",         "Print",            "displaying output"},
+    {"what's",          "Print",            "displaying output"},
+    {"reveal",          "Print",            "displaying output"},
+    {"log",             "Print",            "displaying output"},
+    {"output",          "Print",            "displaying output"},
+    {"write out",       "Print",            "displaying output"},
+    {"spit out",        "Print",            "displaying output"},
+
+    /* ---- Verbs of computation ---- */
+    {"add up",          "the sum of",       "summing values"},
+    {"add together",    "the sum of",       "summing values"},
+    {"total up",        "the sum of",       "summing values"},
+    {"total",           "the sum of",       "summing values"},
+    {"tally",           "the sum of",       "summing values"},
+    {"accumulate",      "the sum of",       "summing values"},
+    {"how many",        "the length of",    "counting items"},
+    {"count up",        "the length of",    "counting items"},
+    {"count",           "the length of",    "counting items"},
+
+    /* ---- Verbs of change ---- */
+    {"update",          "Change",           "modifying a value"},
+    {"modify",          "Change",           "modifying a value"},
+    {"make it",         "Set",              "assigning a value"},
+    {"assign",          "Set",              "assigning a value"},
+    {"replace with",    "Change",           "modifying a value"},
+
+    /* ---- Verbs of iteration ---- */
+    {"go through",      "For every",        "iterating"},
+    {"loop through",    "For every",        "iterating"},
+    {"iterate over",    "For every",        "iterating"},
+    {"for each",        "For every",        "iterating"},
+    {"run through",     "For every",        "iterating"},
+    {"step through",    "For every",        "iterating"},
+    {"cycle through",   "For every",        "iterating"},
+    {"check each",      "For every",        "iterating"},
+    {"look at each",    "For every",        "iterating"},
+
+    /* ---- Verbs of condition ---- */
+    {"whenever",        "If",               "conditional check"},
+    {"in case",         "If",               "conditional check"},
+    {"assuming",        "If",               "conditional check"},
+    {"when",            "If",               "conditional check"},
+    {"suppose",         "If",               "conditional check"},
+    {"given that",      "If",               "conditional check"},
+    {"provided that",   "If",               "conditional check"},
+    {"or else",         "Otherwise",        "alternative branch"},
+    {"if not",          "Otherwise",        "alternative branch"},
+    {"else",            "Otherwise",        "alternative branch"},
+
+    /* ---- Comparisons ---- */
+    {"above",           "greater than",     "comparison"},
+    {"over",            "greater than",     "comparison"},
+    {"exceeds",         "greater than",     "comparison"},
+    {"more than",       "greater than",     "comparison"},
+    {"higher than",     "greater than",     "comparison"},
+    {"bigger than",     "greater than",     "comparison"},
+    {"larger than",     "greater than",     "comparison"},
+    {"below",           "less than",        "comparison"},
+    {"under",           "less than",        "comparison"},
+    {"fewer than",      "less than",        "comparison"},
+    {"lower than",      "less than",        "comparison"},
+    {"smaller than",    "less than",        "comparison"},
+    {"same as",         "equals",           "equality check"},
+    {"equal to",        "equals",           "equality check"},
+    {"identical to",    "equals",           "equality check"},
+    {"matches",         "equals",           "equality check"},
+
+    /* ---- Type words ---- */
+    {"integer",         "number",           "a numeric type"},
+    {"int",             "number",           "a numeric type"},
+    {"float",           "number",           "a numeric type"},
+    {"decimal",         "number",           "a numeric type"},
+    {"string",          "word",             "a text type"},
+    {"text",            "word",             "a text type"},
+    {"boolean",         "truth",            "a true/false type"},
+    {"bool",            "truth",            "a true/false type"},
+    {"flag",            "truth",            "a true/false type"},
+    {"array",           "list",             "a collection type"},
+    {"collection",      "list",             "a collection type"},
+
+    /* ---- Number words (helpful when voices become text) ---- */
+    {"zero",            "0",                "a number in words"},
+    {"one",             "1",                "a number in words"},
+    {"two",             "2",                "a number in words"},
+    {"three",           "3",                "a number in words"},
+    {"four",            "4",                "a number in words"},
+    {"five",            "5",                "a number in words"},
+    {"six",             "6",                "a number in words"},
+    {"seven",           "7",                "a number in words"},
+    {"eight",           "8",                "a number in words"},
+    {"nine",            "9",                "a number in words"},
+    {"ten",             "10",               "a number in words"},
+    {"twenty",          "20",               "a number in words"},
+    {"thirty",          "30",               "a number in words"},
+    {"forty",           "40",               "a number in words"},
+    {"fifty",           "50",               "a number in words"},
+    {"a hundred",       "100",              "a number in words"},
+    {"hundred",         "100",              "a number in words"},
+    {"a thousand",      "1000",             "a number in words"},
+    {"thousand",        "1000",             "a number in words"},
+    {"ten thousand",    "10000",            "a number in words"},
+    {"a million",       "1000000",          "a number in words"},
+    {"10k",             "10000",            "a number in short form"},
+    {"100k",            "100000",           "a number in short form"},
+    {"1m",              "1000000",          "a number in short form"},
+
+    {NULL, NULL, NULL}
+};
+
+/* The words the Interpreter quietly removes before she even
+ * begins to listen. Grammatical filler. Throat-clearing. The
+ * sounds people make while they are still deciding what they
+ * really want to say. */
+static const char *the_filler_words[] = {
+    "okay so", "alright", "basically", "actually", "really",
+    "just", "um", "uh", "you know", "i guess", "kind of",
+    "sort of", "i mean", "like i said", "so yeah", "hmm",
+    "please", "can you", "could you", "would you", "i want to",
+    "i'd like to", "i would like to", "let's",
+    NULL
+};
+
+/* How confident the Interpreter is about a single fragment of
+ * speech she has tried to translate. */
+typedef enum {
+    UNDERSTOOD_PERFECTLY, /* the words were already Babel         */
+    UNDERSTOOD_PROBABLY,  /* she translated through her book      */
+    NEEDS_A_VALUE,        /* partial — she needs a missing detail */
+    NOT_UNDERSTOOD        /* truly lost                           */
+} how_well_she_understood;
+
+typedef struct {
+    char the_travelers_words[256];
+    char the_babel_translation[256];
+    how_well_she_understood her_confidence;
+    char her_reason[160];
+} an_interpretation;
+
+typedef struct {
+    an_interpretation fragments[64];
+    int how_many_fragments;
+    char the_reconstructed_babel[4096];
+    int has_red_slots;
+    int has_yellow_slots;
+} the_interpretation;
+
+/* A small case-insensitive match: does "needle" appear at the
+ * start of "haystack"? Returns the length of the match, or 0. */
+static int she_hears_phrase(const char *haystack, const char *needle) {
+    int i = 0;
+    while (needle[i]) {
+        char a = haystack[i], b = needle[i];
+        if (!a) return 0;
+        if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+        if (a != b) return 0;
+        i++;
+    }
+    /* Must be at a word boundary — the next character should not
+     * be a letter, or we would match "for" inside "forty". */
+    char nxt = haystack[i];
+    if ((nxt >= 'a' && nxt <= 'z') || (nxt >= 'A' && nxt <= 'Z')) return 0;
+    return i;
+}
+
+/* She removes the filler words first, so the rest of her
+ * listening has less noise to wade through. */
+static void she_removes_the_filler(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    /* We keep what's inside quotation marks exactly as given. */
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            int matched = 0;
+            for (int f = 0; at_word_start && the_filler_words[f]; f++) {
+                int n = she_hears_phrase(in + i, the_filler_words[f]);
+                if (n > 0) {
+                    i += n;
+                    /* also swallow a trailing comma or space */
+                    while (in[i] == ' ' || in[i] == ',') i++;
+                    matched = 1;
+                    break;
+                }
+            }
+            if (matched) continue;
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* She walks the traveler's cleaned speech once, and wherever she
+ * recognises a phrase from her book, she writes the Babel word
+ * in its place. She prefers the longest match, so that "add up"
+ * beats "add" and "show me" beats "show". She does not touch
+ * anything inside quotation marks. */
+static int she_consults_the_book(const char *in, char *out, int out_size) {
+    int used = 0;
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            /* Only start a match at a word boundary — otherwise
+             * "int" would happily eat the middle of "print". */
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            int best_n = 0;
+            const a_page_in_the_book *best = NULL;
+            if (at_word_start) {
+                for (int p = 0; the_book_of_tongues[p].the_travelers_phrase; p++) {
+                    int n = she_hears_phrase(in + i, the_book_of_tongues[p].the_travelers_phrase);
+                    if (n > best_n) {
+                        best_n = n;
+                        best = &the_book_of_tongues[p];
+                    }
+                }
+            }
+            if (best) {
+                const char *r = best->the_babel_phrase;
+                while (*r && o < out_size - 1) out[o++] = *r++;
+                i += best_n;
+                used++;
+                continue;
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+    return used;
+}
+
+/* She breaks the speech at the natural seams: periods, and the
+ * little connecting phrases travelers use between thoughts
+ * ("and then", "then", "after that", "next"). Each seam becomes
+ * one Babel sentence. */
+static int she_finds_the_seams(const char *in, char segments[][512], int max) {
+    static const char *connectors[] = {
+        "and then", "after that", "and finally", "finally",
+        "next,", "then,", "also,", NULL
+    };
+    int n = 0, o = 0;
+    char buf[512];
+    int inside_quotes = 0;
+    int i = 0;
+    while (in[i] && n < max) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            if (o < (int)sizeof(buf) - 1) buf[o++] = in[i];
+            i++;
+            continue;
+        }
+        if (!inside_quotes) {
+            int hit = 0;
+            for (int c = 0; connectors[c]; c++) {
+                int k = she_hears_phrase(in + i, connectors[c]);
+                if (k > 0) { i += k; hit = 1; break; }
+            }
+            if (hit) {
+                buf[o] = '\0';
+                if (o > 0) {
+                    strncpy(segments[n], buf, 511);
+                    segments[n][511] = '\0';
+                    n++;
+                }
+                o = 0;
+                while (in[i] == ' ' || in[i] == ',' || in[i] == '.') i++;
+                continue;
+            }
+            if (in[i] == '.') {
+                buf[o] = '\0';
+                if (o > 0) {
+                    strncpy(segments[n], buf, 511);
+                    segments[n][511] = '\0';
+                    n++;
+                }
+                o = 0;
+                i++;
+                while (in[i] == ' ') i++;
+                continue;
+            }
+        }
+        if (o < (int)sizeof(buf) - 1) buf[o++] = in[i];
+        i++;
+    }
+    if (o > 0 && n < max) {
+        buf[o] = '\0';
+        strncpy(segments[n], buf, 511);
+        segments[n][511] = '\0';
+        n++;
+    }
+    /* Trim trailing/leading whitespace on each segment. */
+    for (int s = 0; s < n; s++) {
+        char *p = segments[s];
+        while (*p == ' ' || *p == '\t') p++;
+        if (p != segments[s]) memmove(segments[s], p, strlen(p) + 1);
+        int L = (int)strlen(segments[s]);
+        while (L > 0 && (segments[s][L-1] == ' ' || segments[s][L-1] == '\t'))
+            segments[s][--L] = '\0';
+    }
+    return n;
+}
+
+/* Ask the tower, very politely and very quietly, whether a
+ * single sentence would parse as Babel. If it would, return 1.
+ * If it would have made the tower apologize, catch the apology
+ * and return 0. The Interpreter uses this to decide whether a
+ * translated sentence is ready to run. */
+static int she_asks_the_tower_quietly(const char *sentence) {
+    /* Remember the pool marks so we can roll back whatever the
+     * trial parse allocated. */
+    int words_mark = how_many_words_so_far;
+    int rooms_mark = how_many_rooms_built;
+    int things_mark = how_many_things_so_far;
+    int registries_mark = how_many_registries_so_far;
+
+    /* We need a nul-terminated line ending in a newline for the
+     * lexer's indentation state to settle. */
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s\n", sentence);
+
+    the_tower_is_being_patient = 1;
+    the_last_quiet_apology[0] = '\0';
+    int ok = 1;
+    if (setjmp(the_patient_jump) == 0) {
+        the_lexer she;
+        the_lexer_begins(&she, buf);
+        the_lexer_speaks_through_the_whole_manuscript(&she);
+        (void)the_parser_builds_the_tower();
+    } else {
+        ok = 0;
+    }
+    the_tower_is_being_patient = 0;
+
+    /* Roll back the pools so the trial does not leak. */
+    how_many_words_so_far = words_mark;
+    how_many_rooms_built = rooms_mark;
+    how_many_things_so_far = things_mark;
+    how_many_registries_so_far = registries_mark;
+    return ok;
+}
+
+/* The Interpreter listens, from end to end, and hands back her
+ * interpretation: what she was sure of, what she guessed, what
+ * she could not make out. */
+static the_interpretation the_interpreter_listens(const char *the_travelers_speech) {
+    the_interpretation result;
+    memset(&result, 0, sizeof(result));
+
+    char cleaned[4096];
+    she_removes_the_filler(the_travelers_speech, cleaned, sizeof(cleaned));
+
+    char segments[64][512];
+    int n = she_finds_the_seams(cleaned, segments, 64);
+
+    for (int s = 0; s < n && result.how_many_fragments < 64; s++) {
+        an_interpretation *f = &result.fragments[result.how_many_fragments];
+        strncpy(f->the_travelers_words, segments[s], sizeof(f->the_travelers_words) - 1);
+
+        /* Consult the book first — maybe the traveler used some
+         * familiar-but-loose phrasing the Interpreter knows how to
+         * tighten up. */
+        char translated[1024];
+        int used = she_consults_the_book(segments[s], translated, sizeof(translated));
+        char trial[1100];
+        snprintf(trial, sizeof(trial), "%s.", translated);
+
+        /* If the book left the text alone, ask the tower whether
+         * the traveler's own words are already valid Babel. The
+         * tower is a strict judge — it will reject references to
+         * names it has not yet met — but when it says yes, we can
+         * be sure. */
+        if (used == 0 && she_asks_the_tower_quietly(trial)) {
+            strncpy(f->the_babel_translation, trial, sizeof(f->the_babel_translation) - 1);
+            f->her_confidence = UNDERSTOOD_PERFECTLY;
+            strncpy(f->her_reason, "already valid Babel", sizeof(f->her_reason) - 1);
+            result.how_many_fragments++;
+            continue;
+        }
+
+        /* The book did something, or the parser was unhappy. We
+         * take the translation as our best guess and mark it
+         * yellow — the traveler can say "yes" to confirm. */
+        strncpy(f->the_babel_translation, trial, sizeof(f->the_babel_translation) - 1);
+        if (used > 0) {
+            f->her_confidence = UNDERSTOOD_PROBABLY;
+            snprintf(f->her_reason, sizeof(f->her_reason),
+                     "I recognised %d familiar phrase%s", used, used == 1 ? "" : "s");
+        } else {
+            f->her_confidence = UNDERSTOOD_PROBABLY;
+            strncpy(f->her_reason,
+                    "I'm passing this through as-is — does it look right?",
+                    sizeof(f->her_reason) - 1);
+        }
+        result.has_yellow_slots = 1;
+        result.how_many_fragments++;
+    }
+
+    /* Assemble whatever we have so far. */
+    result.the_reconstructed_babel[0] = '\0';
+    int rb = 0;
+    for (int i = 0; i < result.how_many_fragments; i++) {
+        const char *t = result.fragments[i].the_babel_translation;
+        if (!t[0]) continue;
+        int L = (int)strlen(t);
+        if (rb + L + 2 >= (int)sizeof(result.the_reconstructed_babel)) break;
+        memcpy(result.the_reconstructed_babel + rb, t, L);
+        rb += L;
+        result.the_reconstructed_babel[rb++] = '\n';
+    }
+    result.the_reconstructed_babel[rb] = '\0';
+    return result;
+}
+
+/* A small, cheerful vocabulary of yeses. No NLP, just a list. */
+static int she_hears_a_yes(const char *response) {
+    static const char *yeses[] = {
+        "yes", "y", "yeah", "yep", "yup", "correct", "right",
+        "ok", "okay", "sure", "mhm", "yea", "absolutely",
+        "definitely", "that's right", "exactly", "perfect",
+        "confirmed", "go", "go ahead", "do it", "run it",
+        "proceed", "ship it", "send it", NULL
+    };
+    /* Lowercase a local copy, trimming whitespace. */
+    char lower[128];
+    int o = 0, i = 0;
+    while (response[i] == ' ' || response[i] == '\t') i++;
+    while (response[i] && o < (int)sizeof(lower) - 1) {
+        char c = response[i++];
+        if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+        lower[o++] = c;
+    }
+    while (o > 0 && (lower[o-1] == ' ' || lower[o-1] == '\n' || lower[o-1] == '\r' || lower[o-1] == '.' || lower[o-1] == '!'))
+        o--;
+    lower[o] = '\0';
+    for (int k = 0; yeses[k]; k++)
+        if (strcmp(lower, yeses[k]) == 0) return 1;
+    return 0;
+}
+
+/* She shows the traveler her understanding, all at once, and
+ * marks each piece with a small sign: a check for the parts she
+ * is sure of, a question mark for the parts she guessed, a cross
+ * for the parts she could not make out. */
+#define THE_GREEN  "\x1b[32m"
+#define THE_YELLOW "\x1b[33m"
+#define THE_RED    "\x1b[31m"
+#define THE_DIM    "\x1b[2m"
+#define THE_BOLD   "\x1b[1m"
+#define THE_RESET  "\x1b[0m"
+
+static void she_shows_her_understanding(const the_interpretation *interp) {
+    printf("\n  I think you mean:\n\n");
+    for (int i = 0; i < interp->how_many_fragments; i++) {
+        const an_interpretation *f = &interp->fragments[i];
+        const char *mark;
+        const char *color;
+        switch (f->her_confidence) {
+        case UNDERSTOOD_PERFECTLY: mark = "✓"; color = THE_GREEN;  break;
+        case UNDERSTOOD_PROBABLY:  mark = "?"; color = THE_YELLOW; break;
+        case NEEDS_A_VALUE:        mark = "…"; color = THE_YELLOW; break;
+        default:                   mark = "✗"; color = THE_RED;    break;
+        }
+        if (f->the_babel_translation[0]) {
+            printf("    %s%s%s %s%s%s\n",
+                   color, mark, THE_RESET,
+                   THE_BOLD, f->the_babel_translation, THE_RESET);
+        } else {
+            printf("    %s%s%s \"%s\"\n",
+                   color, mark, THE_RESET, f->the_travelers_words);
+        }
+        if (f->her_confidence != UNDERSTOOD_PERFECTLY)
+            printf("      %s← %s%s\n", THE_DIM, f->her_reason, THE_RESET);
+    }
+    printf("\n");
+}
+
+/* When there are yellow slots (guesses) or red slots (unknowns),
+ * she walks the traveler through them one at a time. A yes
+ * confirms; a correction replaces; "skip" drops the fragment. */
+static void she_resolves_the_uncertain(the_interpretation *interp) {
+    if (interp->has_yellow_slots) {
+        printf("  Quick confirmations — say %syes%s, or correct me:\n\n",
+               THE_BOLD, THE_RESET);
+        for (int i = 0; i < interp->how_many_fragments; i++) {
+            an_interpretation *f = &interp->fragments[i];
+            if (f->her_confidence != UNDERSTOOD_PROBABLY) continue;
+            printf("    %s?%s \"%s\"\n", THE_YELLOW, THE_RESET, f->the_travelers_words);
+            printf("      → %s%s%s\n", THE_BOLD, f->the_babel_translation, THE_RESET);
+            printf("      correct? ");
+            fflush(stdout);
+            char reply[256];
+            if (!fgets(reply, sizeof(reply), stdin)) return;
+            reply[strcspn(reply, "\n")] = '\0';
+            if (reply[0] == '\0' || she_hears_a_yes(reply)) {
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("      %s✓%s\n\n", THE_GREEN, THE_RESET);
+                continue;
+            }
+            /* The traveler gave a correction. Try it as Babel, or
+             * translate through the book. */
+            char with_period[300];
+            snprintf(with_period, sizeof(with_period), "%s.", reply);
+            if (she_asks_the_tower_quietly(with_period)) {
+                strncpy(f->the_babel_translation, with_period, sizeof(f->the_babel_translation) - 1);
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("      %s✓ Updated%s\n\n", THE_GREEN, THE_RESET);
+                continue;
+            }
+            char retranslated[512];
+            int used = she_consults_the_book(reply, retranslated, sizeof(retranslated));
+            char with_period2[600];
+            snprintf(with_period2, sizeof(with_period2), "%s.", retranslated);
+            if (used > 0 && she_asks_the_tower_quietly(with_period2)) {
+                strncpy(f->the_babel_translation, with_period2, sizeof(f->the_babel_translation) - 1);
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("      %s✓ Got it: %s%s\n\n", THE_GREEN, with_period2, THE_RESET);
+            } else {
+                printf("      %s✗ I still don't understand — skipping.%s\n\n", THE_RED, THE_RESET);
+                f->her_confidence = NOT_UNDERSTOOD;
+                f->the_babel_translation[0] = '\0';
+            }
+        }
+    }
+
+    if (interp->has_red_slots) {
+        printf("  I need your help with a few things:\n\n");
+        for (int i = 0; i < interp->how_many_fragments; i++) {
+            an_interpretation *f = &interp->fragments[i];
+            if (f->her_confidence == UNDERSTOOD_PERFECTLY) continue;
+            if (f->her_confidence == UNDERSTOOD_PROBABLY) continue;
+            printf("    you said: \"%s\"\n", f->the_travelers_words);
+            if (f->her_confidence == NEEDS_A_VALUE)
+                printf("    I got: %s%s%s, but a piece is missing.\n",
+                       THE_BOLD, f->the_babel_translation, THE_RESET);
+            else
+                printf("    I don't know how to put this into Babel.\n");
+            printf("    say it differently, or type %sskip%s: ", THE_BOLD, THE_RESET);
+            fflush(stdout);
+            char reply[256];
+            if (!fgets(reply, sizeof(reply), stdin)) return;
+            reply[strcspn(reply, "\n")] = '\0';
+            if (strcmp(reply, "skip") == 0 || strcmp(reply, "nevermind") == 0 || reply[0] == '\0') {
+                f->the_babel_translation[0] = '\0';
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("    %sskipped%s\n\n", THE_DIM, THE_RESET);
+                continue;
+            }
+            char with_period[300];
+            snprintf(with_period, sizeof(with_period), "%s.", reply);
+            if (she_asks_the_tower_quietly(with_period)) {
+                strncpy(f->the_babel_translation, with_period, sizeof(f->the_babel_translation) - 1);
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("    %s✓%s\n\n", THE_GREEN, THE_RESET);
+                continue;
+            }
+            char retranslated[512];
+            int used = she_consults_the_book(reply, retranslated, sizeof(retranslated));
+            char with_period2[600];
+            snprintf(with_period2, sizeof(with_period2), "%s.", retranslated);
+            if (used > 0 && she_asks_the_tower_quietly(with_period2)) {
+                strncpy(f->the_babel_translation, with_period2, sizeof(f->the_babel_translation) - 1);
+                f->her_confidence = UNDERSTOOD_PERFECTLY;
+                printf("    %s✓ Got it: %s%s\n\n", THE_GREEN, with_period2, THE_RESET);
+            } else {
+                printf("    %s✗ still lost — skipping.%s\n\n", THE_RED, THE_RESET);
+                f->the_babel_translation[0] = '\0';
+                f->her_confidence = NOT_UNDERSTOOD;
+            }
+        }
+    }
+
+    /* Reassemble after the corrections. */
+    interp->the_reconstructed_babel[0] = '\0';
+    int rb = 0;
+    for (int i = 0; i < interp->how_many_fragments; i++) {
+        const char *t = interp->fragments[i].the_babel_translation;
+        if (!t[0]) continue;
+        int L = (int)strlen(t);
+        if (rb + L + 2 >= (int)sizeof(interp->the_reconstructed_babel)) break;
+        memcpy(interp->the_reconstructed_babel + rb, t, L);
+        rb += L;
+        interp->the_reconstructed_babel[rb++] = '\n';
+    }
+    interp->the_reconstructed_babel[rb] = '\0';
+}
+
+/* ================================================================
  * EPILOGUE: THE TOWER STANDS
  *
  * The tower was never finished. That was the point. Each new
@@ -2590,6 +3261,59 @@ static void the_conversation_begins(void) {
     printf("\nThe tower stands. Goodbye.\n");
 }
 
+/* A second kind of conversation — this one runs every line past
+ * the Interpreter of Tongues first. The traveler may speak however
+ * they like; the Interpreter shows what she heard, asks for any
+ * confirmations she needs, and then hands the agreed-upon Babel
+ * to the tower. */
+static void the_conversation_begins_with_an_interpreter(void) {
+    printf("\n");
+    printf("  +==========================================+\n");
+    printf("  |             B A B E L                    |\n");
+    printf("  |   speak however you like — the Interpreter|\n");
+    printf("  |   will translate for the tower.          |\n");
+    printf("  +------------------------------------------+\n");
+    printf("  |  Say \"Goodbye.\" when you are done.       |\n");
+    printf("  +==========================================+\n\n");
+
+    the_registry *foundation = a_fresh_registry(NULL);
+    char buffer[8192];
+    while (1) {
+        printf("you> ");
+        fflush(stdout);
+        if (!fgets(buffer, sizeof(buffer), stdin)) break;
+        if (strstr(buffer, "Goodbye") || strstr(buffer, "goodbye")) break;
+        buffer[strcspn(buffer, "\n")] = '\0';
+        if (buffer[0] == '\0') continue;
+
+        the_interpretation interp = the_interpreter_listens(buffer);
+        if (interp.how_many_fragments == 0) {
+            printf("  (I heard only silence.)\n\n");
+            continue;
+        }
+        she_shows_her_understanding(&interp);
+        if (interp.has_yellow_slots || interp.has_red_slots)
+            she_resolves_the_uncertain(&interp);
+
+        if (interp.the_reconstructed_babel[0] == '\0') {
+            printf("  (nothing left to run)\n\n");
+            continue;
+        }
+
+        /* Hand the agreed-upon Babel to the tower. */
+        the_lexer she;
+        the_lexer_begins(&she, interp.the_reconstructed_babel);
+        the_lexer_speaks_through_the_whole_manuscript(&she);
+        the_room *plan = the_parser_builds_the_tower();
+        the_thing *result = the_evaluator_enters(plan, foundation);
+        if (result && result->what_it_is != THING_NOTHING) {
+            the_evaluator_speaks_a_thing(result, ", ");
+            printf("\n");
+        }
+    }
+    printf("\nThe tower stands. Goodbye.\n");
+}
+
 /* The story begins, as all stories must, with someone speaking. */
 int main(int the_count_of_arguments, char **the_arguments_themselves) {
     the_world_is_made();
@@ -2600,11 +3324,15 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
      * Otherwise the Evaluator does her usual quiet walk. */
     int the_scribe_is_called = 0;
     int the_scribe_speaks_python = 0;
+    int the_interpreter_is_called = 0;
     const char *the_output_binary = "a.out";
     const char *the_output_python = NULL;
     int first_arg = 1;
     while (first_arg < the_count_of_arguments && the_arguments_themselves[first_arg][0] == '-') {
-        if (strcmp(the_arguments_themselves[first_arg], "-c") == 0) {
+        if (strcmp(the_arguments_themselves[first_arg], "-i") == 0) {
+            the_interpreter_is_called = 1;
+            first_arg++;
+        } else if (strcmp(the_arguments_themselves[first_arg], "-c") == 0) {
             the_scribe_is_called = 1;
             first_arg++;
             if (first_arg < the_count_of_arguments &&
@@ -2644,8 +3372,26 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
         the_speech[how_much_was_read + 1] = '\0';
         fclose(the_manuscript);
 
+        /* If the Interpreter has been summoned for a file, we run
+         * the whole manuscript through her first, then hand the
+         * translated Babel to the tower. Corrections are impossible
+         * without a human at the keyboard, so yellow slots are
+         * accepted as-is and red slots are dropped with a warning. */
+        char *the_speech_to_parse = the_speech;
+        the_interpretation file_interp;
+        if (the_interpreter_is_called) {
+            file_interp = the_interpreter_listens(the_speech);
+            if (file_interp.has_red_slots) {
+                fprintf(stderr,
+                    "The Interpreter could not translate every line of \"%s\".\n"
+                    "Running what she understood; the rest was dropped.\n",
+                    the_manuscript_path);
+            }
+            the_speech_to_parse = file_interp.the_reconstructed_babel;
+        }
+
         the_lexer she;
-        the_lexer_begins(&she, the_speech);
+        the_lexer_begins(&she, the_speech_to_parse);
         the_lexer_speaks_through_the_whole_manuscript(&she);
 
         the_room *the_tower = the_parser_builds_the_tower();
@@ -2669,7 +3415,10 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
         return 0;
     }
 
-    the_conversation_begins();
+    if (the_interpreter_is_called)
+        the_conversation_begins_with_an_interpreter();
+    else
+        the_conversation_begins();
     return 0;
 }
 
