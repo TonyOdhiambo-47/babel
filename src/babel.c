@@ -2237,6 +2237,312 @@ static int the_scribe_compiles(the_room *top, const char *output_path) {
 }
 
 /* ================================================================
+ * CHAPTER FOUR-AND-A-HALF: THE SCRIBE LEARNS A YOUNGER TONGUE
+ *
+ * After she finished her translation into C, the Scribe heard of
+ * another language — younger than C, gentler, whose speakers
+ * valued being understood at a glance more than being fast. They
+ * called it Python, and they asked if she would write the tower
+ * out for them too.
+ *
+ * She agreed, on one condition: the Python translation would be
+ * a record, not a race. It would run no faster than the Evaluator
+ * herself — it would only be there for the readers who preferred
+ * to see the tower written in their own language first, and then
+ * compare.
+ *
+ * So she opened a second scroll, and beside each C room she had
+ * written, she wrote its Python twin. The two scrolls agreed on
+ * every meaning that mattered, and where they differed, the
+ * Scribe marked it plainly, so no one would be misled.
+ * ================================================================ */
+
+static void the_scribe_renders_python_expression(FILE *out, the_room *r);
+
+static void the_scribe_renders_python_name(FILE *out, const char *name) {
+    /* Python accepts identifiers with underscores but not spaces. */
+    for (const char *p = name; *p; p++)
+        fputc((*p == ' ' || *p == '-') ? '_' : *p, out);
+}
+
+static void the_scribe_renders_python_string(FILE *out, const char *s) {
+    fputc('"', out);
+    for (const char *p = s; *p; p++) {
+        if (*p == '"' || *p == '\\') fputc('\\', out);
+        fputc(*p, out);
+    }
+    fputc('"', out);
+}
+
+static void the_scribe_renders_python_expression(FILE *out, the_room *r) {
+    if (!r) { fputs("None", out); return; }
+    switch (r->what_kind) {
+    case ROOM_NUMBER:
+        /* Emit whole numbers as ints so Python division behaves. */
+        if (r->the_count == (long long)r->the_count)
+            fprintf(out, "%lld", (long long)r->the_count);
+        else
+            fprintf(out, "%.17g", r->the_count);
+        return;
+    case ROOM_BOOLEAN: fputs(r->the_truth ? "True" : "False", out); return;
+    case ROOM_STRING:  the_scribe_renders_python_string(out, r->the_text); return;
+    case ROOM_NOTHING: fputs("None", out); return;
+    case ROOM_VARIABLE:
+        the_scribe_renders_python_name(out, r->the_text);
+        return;
+    case ROOM_LENGTH:
+        fputs("len(", out);
+        the_scribe_renders_python_name(out, r->the_text);
+        fputs(")", out);
+        return;
+    case ROOM_SUM:
+        fputs("sum(", out);
+        the_scribe_renders_python_name(out, r->the_text);
+        fputs(")", out);
+        return;
+    case ROOM_BINARY_OP: {
+        const char *op = r->the_text;
+        const char *py = NULL;
+        if (strcmp(op, "+") == 0) py = "+";
+        else if (strcmp(op, "-") == 0) py = "-";
+        else if (strcmp(op, "*") == 0) py = "*";
+        else if (strcmp(op, "/") == 0) py = "/";
+        else if (strcmp(op, "%") == 0) py = "%";
+        else if (strcmp(op, "<") == 0) py = "<";
+        else if (strcmp(op, ">") == 0) py = ">";
+        else if (strcmp(op, "==") == 0 || strcmp(op, "is") == 0) py = "==";
+        else if (strcmp(op, "neq") == 0) py = "!=";
+        if (py) {
+            fputs("(", out);
+            the_scribe_renders_python_expression(out, r->the_left);
+            fprintf(out, " %s ", py);
+            the_scribe_renders_python_expression(out, r->the_right);
+            fputs(")", out);
+            return;
+        }
+        if (strcmp(op, "div") == 0) {
+            fputs("((", out);
+            the_scribe_renders_python_expression(out, r->the_left);
+            fputs(" % ", out);
+            the_scribe_renders_python_expression(out, r->the_right);
+            fputs(") == 0)", out);
+            return;
+        }
+        if (strcmp(op, "ndiv") == 0) {
+            fputs("((", out);
+            the_scribe_renders_python_expression(out, r->the_left);
+            fputs(" % ", out);
+            the_scribe_renders_python_expression(out, r->the_right);
+            fputs(") != 0)", out);
+            return;
+        }
+        the_tower_apologizes(r->which_line, "The Scribe doesn't yet know how to write \"%s\" in Python.", op);
+        return;
+    }
+    case ROOM_FUNCTION_CALL: {
+        the_scribe_renders_python_name(out, r->the_recipe_name);
+        fputc('(', out);
+        for (int i = 0; i < r->how_many_arguments; i++) {
+            if (i > 0) fputs(", ", out);
+            the_scribe_renders_python_expression(out, r->the_arguments[i]);
+        }
+        fputc(')', out);
+        return;
+    }
+    default:
+        the_tower_apologizes(r->which_line, "The Scribe doesn't yet know how to render this kind of room in Python.");
+    }
+}
+
+static void the_scribe_renders_python_indent(FILE *out, int depth) {
+    for (int i = 0; i < depth; i++) fputs("    ", out);
+}
+
+static void the_scribe_renders_python_statement(FILE *out, the_room *r, int depth);
+
+static void the_scribe_renders_python_block(FILE *out, the_room *block, int depth) {
+    if (!block) {
+        the_scribe_renders_python_indent(out, depth);
+        fputs("pass\n", out);
+        return;
+    }
+    if (block->what_kind != ROOM_BLOCK) {
+        the_scribe_renders_python_statement(out, block, depth);
+        return;
+    }
+    if (block->how_many_rooms_within == 0) {
+        the_scribe_renders_python_indent(out, depth);
+        fputs("pass\n", out);
+        return;
+    }
+    for (int i = 0; i < block->how_many_rooms_within; i++)
+        the_scribe_renders_python_statement(out, block->the_rooms_within[i], depth);
+}
+
+static void the_scribe_renders_python_statement(FILE *out, the_room *r, int depth) {
+    if (!r) return;
+    switch (r->what_kind) {
+    case ROOM_DECLARATION: {
+        int init_is_nothing = r->the_left && r->the_left->what_kind == ROOM_NOTHING;
+        the_scribe_renders_python_indent(out, depth);
+        the_scribe_renders_python_name(out, r->the_text);
+        fputs(" = ", out);
+        if (strcmp(r->the_type, "list") == 0 && (init_is_nothing || !r->the_left)) {
+            fputs("[]", out);
+        } else if (r->the_left && !init_is_nothing) {
+            the_scribe_renders_python_expression(out, r->the_left);
+        } else if (strcmp(r->the_type, "truth") == 0) {
+            fputs("False", out);
+        } else if (strcmp(r->the_type, "word") == 0) {
+            fputs("\"\"", out);
+        } else {
+            fputs("0", out);
+        }
+        fputs("\n", out);
+        return;
+    }
+    case ROOM_ASSIGNMENT:
+        the_scribe_renders_python_indent(out, depth);
+        the_scribe_renders_python_name(out, r->the_text);
+        fputs(" = ", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs("\n", out);
+        return;
+    case ROOM_REMEMBER:
+        the_scribe_renders_python_indent(out, depth);
+        the_scribe_renders_python_name(out, r->the_text);
+        fputs(".append(", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs(")\n", out);
+        return;
+    case ROOM_PRINT: {
+        the_scribe_renders_python_indent(out, depth);
+        the_room *e = r->the_left;
+        if (r->the_separator) {
+            /* print with a separator: join a list, or fall back to str(). */
+            fputs("print(", out);
+            if (r->the_separator) {
+                the_scribe_renders_python_expression(out, r->the_separator);
+                fputs(".join(str(__x) for __x in ", out);
+                the_scribe_renders_python_expression(out, e);
+                fputs("))", out);
+            }
+            fputs("\n", out);
+        } else {
+            fputs("print(", out);
+            the_scribe_renders_python_expression(out, e);
+            fputs(")\n", out);
+        }
+        return;
+    }
+    case ROOM_SAY:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("print(", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs(")\n", out);
+        return;
+    case ROOM_CONDITIONAL:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("if ", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs(":\n", out);
+        the_scribe_renders_python_block(out, r->the_right, depth + 1);
+        if (r->the_destination) {
+            the_scribe_renders_python_indent(out, depth);
+            fputs("else:\n", out);
+            the_scribe_renders_python_block(out, r->the_destination, depth + 1);
+        }
+        return;
+    case ROOM_FOR_LOOP:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("for ", out);
+        the_scribe_renders_python_name(out, r->the_counter_name);
+        fputs(" in range(int(", out);
+        the_scribe_renders_python_expression(out, r->the_beginning);
+        fputs("), int(", out);
+        the_scribe_renders_python_expression(out, r->the_destination);
+        fputs(") + 1):\n", out);
+        the_scribe_renders_python_block(out, r->the_left, depth + 1);
+        return;
+    case ROOM_WHILE_LOOP:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("while ", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs(":\n", out);
+        the_scribe_renders_python_block(out, r->the_right, depth + 1);
+        return;
+    case ROOM_RETURN:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("return ", out);
+        the_scribe_renders_python_expression(out, r->the_left);
+        fputs("\n", out);
+        return;
+    case ROOM_STOP:
+        the_scribe_renders_python_indent(out, depth);
+        fputs("break\n", out);
+        return;
+    case ROOM_FUNCTION_CALL:
+        the_scribe_renders_python_indent(out, depth);
+        the_scribe_renders_python_expression(out, r);
+        fputs("\n", out);
+        return;
+    case ROOM_BLOCK:
+        the_scribe_renders_python_block(out, r, depth);
+        return;
+    case ROOM_FUNCTION_DEF:
+        /* Function definitions are emitted in a pre-pass. */
+        return;
+    default:
+        the_tower_apologizes(r->which_line, "The Scribe doesn't know how to translate this room into Python.");
+    }
+}
+
+static void the_scribe_renders_python_recipes(FILE *out, the_room *top) {
+    if (!top || top->what_kind != ROOM_BLOCK) return;
+    for (int i = 0; i < top->how_many_rooms_within; i++) {
+        the_room *r = top->the_rooms_within[i];
+        if (r->what_kind != ROOM_FUNCTION_DEF) continue;
+        fputs("def ", out);
+        the_scribe_renders_python_name(out, r->the_recipe_name);
+        fputc('(', out);
+        for (int p = 0; p < r->how_many_ingredients; p++) {
+            if (p > 0) fputs(", ", out);
+            the_scribe_renders_python_name(out, r->the_ingredients[p]);
+        }
+        fputs("):\n", out);
+        the_scribe_renders_python_block(out, r->the_left, 1);
+        fputs("\n", out);
+    }
+}
+
+/* The complete Python transcription: the Scribe walks the tower
+ * once, writing a Python twin for every room that has one. */
+static int the_scribe_transcribes_into_python(the_room *top, const char *output_path) {
+    FILE *out = output_path ? fopen(output_path, "w") : stdout;
+    if (!out) the_tower_apologizes(0, "I couldn't open a place to write the Python source.");
+
+    fputs("# This Python file was transcribed from a Babel manuscript.\n", out);
+    fputs("# The Scribe wrote it so readers of Python could see the tower\n", out);
+    fputs("# in their own language. Run it with `python3 <this-file>`.\n\n", out);
+
+    the_scribe_renders_python_recipes(out, top);
+
+    if (top && top->what_kind == ROOM_BLOCK) {
+        for (int i = 0; i < top->how_many_rooms_within; i++) {
+            the_room *r = top->the_rooms_within[i];
+            if (r->what_kind == ROOM_FUNCTION_DEF) continue;
+            the_scribe_renders_python_statement(out, r, 0);
+        }
+    }
+
+    if (output_path) {
+        fclose(out);
+        fprintf(stderr, "Babel: wrote a Python transcription to %s\n", output_path);
+    }
+    return 0;
+}
+
+/* ================================================================
  * EPILOGUE: THE TOWER STANDS
  *
  * The tower was never finished. That was the point. Each new
@@ -2288,10 +2594,14 @@ static void the_conversation_begins(void) {
 int main(int the_count_of_arguments, char **the_arguments_themselves) {
     the_world_is_made();
 
-    /* The Scribe is summoned only when asked, with the -c flag.
+    /* The Scribe is summoned only when asked.
+     *   -c [-o out]   — write a native binary through the C twin
+     *   -p [-o out]   — write a Python transcription instead
      * Otherwise the Evaluator does her usual quiet walk. */
     int the_scribe_is_called = 0;
+    int the_scribe_speaks_python = 0;
     const char *the_output_binary = "a.out";
+    const char *the_output_python = NULL;
     int first_arg = 1;
     while (first_arg < the_count_of_arguments && the_arguments_themselves[first_arg][0] == '-') {
         if (strcmp(the_arguments_themselves[first_arg], "-c") == 0) {
@@ -2302,6 +2612,15 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
                 first_arg++;
                 if (first_arg < the_count_of_arguments)
                     the_output_binary = the_arguments_themselves[first_arg++];
+            }
+        } else if (strcmp(the_arguments_themselves[first_arg], "-p") == 0) {
+            the_scribe_speaks_python = 1;
+            first_arg++;
+            if (first_arg < the_count_of_arguments &&
+                strcmp(the_arguments_themselves[first_arg], "-o") == 0) {
+                first_arg++;
+                if (first_arg < the_count_of_arguments)
+                    the_output_python = the_arguments_themselves[first_arg++];
             }
         } else break;
     }
@@ -2333,6 +2652,12 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
 
         if (the_scribe_is_called) {
             int rc = the_scribe_compiles(the_tower, the_output_binary);
+            free(the_speech);
+            return rc;
+        }
+
+        if (the_scribe_speaks_python) {
+            int rc = the_scribe_transcribes_into_python(the_tower, the_output_python);
             free(the_speech);
             return rc;
         }

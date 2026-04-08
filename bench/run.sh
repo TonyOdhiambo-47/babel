@@ -1,10 +1,11 @@
 #!/bin/sh
-# A small footrace between three runners:
+# A small footrace between four runners:
 #   - Babel tree walker            (./babel bench/primes.babel)
 #   - Babel C scribe (native -O3)  (./babel -c, then ./out)
+#   - Babel Python transcription   (./babel -p | python3)
 #   - Hand-written Python          (python3 bench/primes.py)
 #
-# All three compute the number of primes below 5000. They should
+# All four compute the number of primes below 5000. They should
 # all say the same number. Only the speeds should differ.
 
 set -e
@@ -25,11 +26,13 @@ echo "bench: count primes below 5000"
 echo
 
 ./babel -c -o /tmp/bench_primes bench/primes.babel >/dev/null
+./babel -p -o /tmp/bench_primes.py bench/primes.babel 2>/dev/null
 
 time_it "babel (tree walker)"          ./babel bench/primes.babel
 time_it "babel (C scribe, -O3)"        /tmp/bench_primes
+time_it "babel (python transcription)" python3 /tmp/bench_primes.py
 time_it "hand-written python"          python3 bench/primes.py
 
 echo
-echo "all three runners should have said the same number."
-rm -f /tmp/bench_primes
+echo "all four runners should have said the same number."
+rm -f /tmp/bench_primes /tmp/bench_primes.py
