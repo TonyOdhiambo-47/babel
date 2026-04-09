@@ -36,19 +36,36 @@ start talking.
 ## Four modes
 
 - **Live** — all four panels, full pipeline visualization. The default.
-- **Editor** — the translation panel becomes a text area. Type Babel directly.
+- **Editor** — the voice panel is replaced by a prose pad. Type loose English
+  into it and watch the Interpreter translate as you go; the microphone is
+  still available if you'd rather talk.
 - **Present** — only the translation and output panels, bigger fonts. For demos.
 - **Teach** — every Babel statement gets an inline explanation. For Foundation Week.
 
 ## Talking to the compiler
 
 The bridge (`server/bridge.mjs`) is the translator between the dashboard and
-the Babel C binary. It keeps a long-running `./babel --json-interpret` process
-around for speech-to-Babel translation, and spawns a fresh `./babel` per run.
+the Babel C binary. It has two jobs:
 
-Everything it streams back is a single JSON object per line, typed via
-`src/types.ts`. If you're adding a new frame type, edit `types.ts` first, then
-both ends will agree.
+1. Keep one long-running `./babel --json-interpret` process around per client.
+   That's a special mode of the Interpreter of Tongues: it reads one line of
+   loose English from stdin at a time and writes one line of JSON to stdout,
+   so the bridge doesn't pay process-start cost per word. The JSON payload
+   contains the translated Babel, the kinds of slots the Interpreter is sure
+   about, and any yellow/red slots that need human confirmation.
+
+2. Spawn a fresh `./babel` (or `./babel -c` / `./babel -p`) per run, write the
+   source to a temp file, and stream stdout/stderr back line by line.
+
+Because the JSON protocol is line-based, the bridge escapes embedded newlines
+in the traveler's prose to `\x01` before writing them to the interpreter's
+stdin — the Interpreter un-escapes them on the other side. That matters
+because paragraph breaks in the prose are how the traveler indicates dedents
+in otherwise-flat text: one blank line pops one level of nesting, two pop two.
+
+Everything the bridge streams back is a single JSON object per line, typed
+via `src/types.ts`. If you're adding a new frame type, edit `types.ts` first,
+then both ends will agree.
 
 ## Why it exists
 

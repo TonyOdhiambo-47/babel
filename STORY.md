@@ -183,19 +183,46 @@ try next.
 
 So the builders called for an Interpreter of Tongues.
 
-She sat at the gate of the tower with a small book. On one side
-of each page was a phrase a traveler might say. On the other
-side was the Babel word the tower was waiting for. *Show me* on
-the left, *Print* on the right. *Make a* on the left, *Let there
-be a* on the right. *Whenever* on the left, *If* on the right.
-The book was not large, but it covered the ways people tended to
+She sat at the gate of the tower with a book. On one side of
+each page was a phrase a traveler might say. On the other side
+was the Babel word the tower was waiting for. *Show me* on the
+left, *Print* on the right. *Make a* on the left, *Let there be
+a* on the right. *Whenever* on the left, *If* on the right. The
+book grew, over time, to cover the many ways people tended to
 ask for the same thing.
+
+But she learned, as travelers kept arriving, that the book was
+not enough on its own. People shortened *Let there be a number
+called "x" that equals seven* to *let x be seven* and expected
+her to know what kind of thing `x` was. They said *N* in one
+breath and *n* in the next and expected them to be the same
+name. They ended programs with *say all done* and meant the
+words, not some variable called `all`. They wrote *if is_prime
+then remember it* and expected *then* to mean a comma.
+
+So she taught herself a small set of habits, each one a quiet
+deterministic pass over the traveler's sentence. She would
+expand the shorthand declarations, inferring the kind from the
+value. She would lowercase everything outside of quotes so
+stray capitalization stopped mattering — but first she would
+auto-quote any run of Capitalized Words, so *Lift Off* and *New
+York* survived as the string literals the traveler clearly
+meant them to be. She would keep a running list of which names
+had been declared, and when a traveler said *say* followed by
+words she did not recognize, she would wrap them in quotes
+instead of treating them as variables. She would turn *then*
+into the comma Babel expected. She would insert the colon
+after *do the following*, reflow the body onto indented lines,
+and — because a traveler's concluding announcement is almost
+never meant to live inside the last loop — dedent a final
+*Say* or *Print* back to the top of the program. A blank line
+in the middle of flat prose would pop one level of nesting;
+two blank lines would pop two.
 
 When a traveler spoke, she did not interrupt. She listened to
 the whole sentence, tore out the filler words — the *okay so*s
-and the *basically*s and the *please can you*s — and then walked
-through what was left, a phrase at a time, looking each one up
-in her book.
+and the *basically*s and the *please can you*s — and then ran
+her passes over what was left.
 
 She had one small trick for telling whether she had succeeded.
 When she thought she had a translation, she would whisper it to

@@ -20,6 +20,8 @@ recipe, what `Remember as` does — go to the **[Language reference](language.md
 - **[Gotchas and limits](gotchas.md)** — the rough edges you will meet if you
   write anything non-trivial. Read this *before* you spend an hour debugging
   something the language simply does not support.
+- **[The living dashboard](../babel-dashboard/README.md)** — a browser window
+  onto the compiler, with voice input, live translation, and streaming output.
 
 ## A one-screen tour
 

@@ -48,21 +48,39 @@ $ python3 primes.py
 
 **Start a REPL** by running `./babel` with no arguments.
 
-**Speak loosely.** If you'd rather not memorize the exact Babel phrasing, run the Interpreter of Tongues in front of the tower with `./babel -i` (or `make friendly`). She accepts freeform English — *show me*, *make a*, *whenever*, *loop through*, and a few dozen other everyday phrases — translates them into Babel, shows you what she heard, asks for confirmation on anything she's not sure about, and then hands the result to the tower.
+**Speak loosely.** If you'd rather not memorize the exact Babel phrasing, run the Interpreter of Tongues in front of the tower with `./babel -i` (or `make friendly`). She accepts freeform English — `let step be zero`, `show me x`, `make a number`, `whenever`, `loop through`, and a few dozen other everyday phrases — translates them into Babel, shows you what she heard, asks for confirmation on anything she's not sure about, and then hands the result to the tower.
 
 ```
 $ ./babel -i
-you> make a number called "x" that equals 7. show me x.
+you> let step be zero, while step is less than ten do the following say step and set step to step plus one, say all done
 
   I think you mean:
 
-    ? Let there be a number called "x" that equals 7.
-    ? Print x.
+    Let there be a number called "step" that equals 0.
+    While step is less than 10, do the following:
+        Say step.
+        Set step to step plus 1.
+    Say "All Done".
 
   correct? yes
-  correct? yes
-  7
+  0
+  1
+  2
+  ...
+  9
+  All Done
 ```
+
+She does quite a bit of deterministic work on your sentence before handing it over:
+
+- **Shorthand declarations.** `let X equal V` / `let X be V` / `let X = V` expand to the full `Let there be a <kind> called "X" that equals V`. The kind is inferred from the value — `true`/`false` → `truth`, a quoted string → `word`, `empty` → `list`, otherwise → `number`.
+- **Case normalization.** She lowercases everything outside quotes so `N` and `n` resolve to the same name, and auto-quotes runs of two or more Capitalized Words (`Lift Off`, `New York`) as string literals before lowercasing, so the traveler's capitalization hint survives.
+- **Context-aware `say`/`print` quoting.** She tracks which names have been declared (from `called "X"` and loop variables in `for every X in/from`). When you say `say count`, `count` is a known variable and stays as an expression; when you say `say all done`, neither word is known, so the whole run is wrapped as `"All Done"`.
+- **`if X then Y` → `if X, Y`.** Travelers naturally say "if is_prime then remember i as primes". She rewrites `then` to the comma Babel expects, and if the condition is a bareword truth (`if is_prime`), she quietly completes it to `if is_prime is true`.
+- **Block punctuation.** She inserts the comma before `do the following` and the colon after, and reflows the body onto its own indented lines. A final `Say`/`Print` at the end of a program auto-dedents to the top level — the traveler's concluding announcement was almost never meant to live inside the last loop.
+- **Paragraph-break dedents.** A blank line in the input pops one level of nesting. Two blank lines pop two levels. That's how flat prose carves out nested block structure.
+
+**Watch the translation happen.** There's also a living browser dashboard in `babel-dashboard/` — four panels (voice, prose, translation, output) and a conversation overlay, with live speech-to-Babel translation as you talk or type. See [`babel-dashboard/README.md`](babel-dashboard/README.md) to run it.
 
 ## About the source
 

@@ -696,4 +696,50 @@ $ ./babel -i path/to/program.babel  # pre-process a file through it
 Starts (or runs) the **Interpreter of Tongues**. She accepts freeform
 English — phrases like *show me*, *make a*, *loop through*, *whenever*,
 *bigger than*, *same as* — and translates them into strict Babel before
-handing the result to the tower. See the [Getting started page](getting-started.md#5-the-friendly-front-end).
+handing the result to the tower.
+
+Her pipeline is a chain of deterministic passes, each handling one kind of
+looseness:
+
+- **Shorthand declarations** — `let X equal V` / `let X be V` / `let X = V`
+  expand to the full `Let there be a <kind> called "X" that equals V`. The
+  kind is inferred from the value (`true`/`false` → `truth`, quoted string
+  → `word`, `empty` → `list`, otherwise → `number`).
+- **Case normalization** — everything outside quotes is lowercased so
+  `N` and `n` resolve to the same name. Before that happens, runs of two
+  or more Capitalized Words are auto-quoted as string literals so emphasis
+  like `Lift Off` or `New York` is preserved.
+- **Context-aware `say`/`print` quoting** — she collects declared names
+  from `called "X"` and `for every X in/from`, then wraps any following
+  bareword argument to `say`/`print` in quotes unless every word in it
+  is a known variable. `say count` stays as an expression; `say all done`
+  becomes `Say "All Done".`
+- **`if X then Y` → `if X, Y`** — `then` is rewritten to the comma Babel
+  expects. If the condition is a bareword truth (`if is_prime`), it is
+  quietly completed to `if is_prime is true`.
+- **Block punctuation** — the comma is inserted before `do the following`
+  and the colon after; the body is reflowed onto indented lines. A
+  trailing `Say` or `Print` at the end of a program is dedented back to
+  the top level, since a traveler's concluding announcement is almost
+  never meant to live inside the final loop.
+- **Paragraph-break dedents** — a blank line in the input pops one level
+  of nesting; two blank lines pop two. This is how flat prose carves out
+  block structure.
+
+The complete table of loose phrases she recognizes lives in `src/babel.c`
+under `the_book_of_tongues`. See also the
+[Getting started page](getting-started.md#5-the-friendly-front-end).
+
+#### JSON mode
+
+```
+$ ./babel --json-interpret
+```
+
+A non-interactive mode used by the [dashboard bridge](../babel-dashboard/README.md).
+She reads one line of loose English from stdin at a time and writes one
+line of JSON to stdout containing the translated Babel plus any slots
+that need confirmation. Because the protocol is line-based, embedded
+newlines in the input are escaped as `\x01` and un-escaped on the
+Interpreter's side — that lets the traveler's paragraph breaks survive
+the round trip so the dedent pass can still see them.

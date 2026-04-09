@@ -111,22 +111,60 @@ the result to the tower.
 
 ```
 $ ./babel -i
-you> make a number called "x" that equals 7. show me x.
+you> let step be zero, while step is less than ten do the following
+     say step and set step to step plus one, say all done
 
   I think you mean:
 
-    ? Let there be a number called "x" that equals 7.
-    ? Print x.
+    Let there be a number called "step" that equals 0.
+    While step is less than 10, do the following:
+        Say step.
+        Set step to step plus 1.
+    Say "All Done".
 
   correct? yes
-  correct? yes
-  7
+  0
+  1
+  ...
+  9
+  All Done
 ```
 
-She understands phrases like *show me*, *make a*, *loop through*, *for
-each*, *whenever*, *or else*, *bigger than*, *same as*, and a few dozen
-others. The full list of loose phrases she knows is in
-`src/babel.c` under `the_book_of_tongues`.
+Behind the friendly prompt is a chain of deterministic passes. Each one
+handles a single kind of looseness, so you can trust the result even when
+the Interpreter doesn't stop to ask:
+
+- **Shorthand declarations.** `let X equal V`, `let X be V`, and `let X = V`
+  all expand to `Let there be a <kind> called "X" that equals V`. The kind
+  is inferred from the value: `true`/`false` → `truth`, a quoted string →
+  `word`, `empty` → `list`, otherwise → `number`.
+- **Case normalization.** Babel identifiers are case-sensitive, but people
+  speak without caring. She lowercases everything outside quotes so `N` and
+  `n` resolve to the same name. Before lowercasing, she auto-quotes any run
+  of two or more Capitalized Words (`Lift Off`, `New York`) as a string
+  literal so the traveler's emphasis survives.
+- **Context-aware `say`/`print` quoting.** She tracks which names have been
+  declared (from `called "X"` and loop variables in `for every X in/from`).
+  When you say `say count`, `count` is a known variable and stays as an
+  expression; when you say `say all done`, neither word is known, so the
+  whole run is wrapped as `"All Done"`.
+- **`if X then Y` → `if X, Y`.** Travelers naturally say "if is_prime then
+  remember i as primes". She rewrites `then` to the comma Babel expects,
+  and if the condition is a bareword truth she quietly completes it to
+  `is true`.
+- **Block punctuation.** She inserts the comma before `do the following`
+  and the colon after, and reflows the body onto its own indented lines.
+  A final `Say`/`Print` at the end of a program auto-dedents to the top
+  level — the traveler's concluding announcement is almost never meant to
+  live inside the last loop.
+- **Paragraph-break dedents.** In flat prose, a blank line pops one level
+  of nesting and two blank lines pop two. That's how you carve nested
+  block structure out of what would otherwise be one long sentence.
+
+The complete table of loose phrases she recognizes lives in `src/babel.c`
+under `the_book_of_tongues` — *show me*, *make a*, *loop through*, *for
+each*, *whenever*, *or else*, *bigger than*, *same as*, and several dozen
+others.
 
 You can also hand her a whole file:
 
@@ -135,6 +173,11 @@ $ ./babel -i my-loose-program.babel
 ```
 
 She pre-processes it into strict Babel, then runs it.
+
+If you'd rather watch the translation happen visually, there's a browser
+dashboard in `babel-dashboard/` that wires the Interpreter up to your
+microphone and four live panels. See
+[`babel-dashboard/README.md`](../babel-dashboard/README.md).
 
 ## 6. Running programs other ways
 
