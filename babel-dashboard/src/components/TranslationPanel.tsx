@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import type { InterpretPayload, Backend, DashboardMode } from '../types';
 import './TranslationPanel.css';
 
-// The middle panel. Shows the Interpreter's verdict. For each
-// fragment of what the user said, it shows the original words
-// above a crossfade to the final Babel translation. New lines
-// slide in with a subtle staggered reveal. Once the lines settle,
-// the panel offers a Run button with a backend selector.
-//
-// In Editor Mode the whole panel becomes a textarea — the user
-// types Babel directly and presses Run. In Teaching Mode each
-// statement gets a small tooltip explaining what it does.
+// The middle panel. Shows the Interpreter's verdict — the formal
+// Babel assembled out of whatever loose English came in, line by
+// line. New lines slide in with a staggered reveal. Once the
+// lines settle, the panel offers a Run button with a backend
+// selector. In Teaching Mode each statement gets a small tooltip
+// explaining what it does.
 
 interface TranslationPanelProps {
   interpretation: InterpretPayload | null;
@@ -78,26 +75,17 @@ function teachNote(line: string): string | null {
 export function TranslationPanel(props: TranslationPanelProps) {
   const { interpretation, mode, onRun, isRunning, backendSelection, onBackendChange } = props;
 
-  // In editor mode the textarea is the source of truth. In every
-  // other mode the interpreter's reconstructed Babel is.
-  const [draft, setDraft] = useState('');
-  useEffect(() => {
-    if (mode !== 'editor' && interpretation) {
-      setDraft(interpretation.babel.trim());
-    }
-  }, [interpretation, mode]);
-
   const lines = useMemo(() => {
-    const source = mode === 'editor' ? draft : interpretation?.babel ?? '';
+    const source = interpretation?.babel ?? '';
     return source
       .split('\n')
       .map((line, i) => ({ id: i, text: line, isBlank: line.trim().length === 0 }));
-  }, [interpretation, draft, mode]);
+  }, [interpretation]);
 
   const revealKey = useMemo(() => JSON.stringify(lines.map((l) => l.text)), [lines]);
 
   const handleRun = () => {
-    const src = mode === 'editor' ? draft : interpretation?.babel ?? '';
+    const src = interpretation?.babel ?? '';
     if (src.trim()) onRun(src, backendSelection);
   };
 
@@ -120,34 +108,24 @@ export function TranslationPanel(props: TranslationPanelProps) {
           <button
             className="run-btn"
             onClick={handleRun}
-            disabled={isRunning || (!interpretation && !draft.trim())}
+            disabled={isRunning || !interpretation?.babel.trim()}
           >
             {isRunning ? 'running…' : 'run ▶'}
           </button>
         </div>
       </header>
-      <div className="panel-body translation-body" key={revealKey}>
-        {mode === 'editor' && (
-          <textarea
-            className="editor"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Let there be a number called &quot;score&quot; that equals 0.
-Print score."
-            spellCheck={false}
-          />
-        )}
-        {mode !== 'editor' && !interpretation && (
+      <div className="panel-body translation-body">
+        {!interpretation && (
           <div className="translation-empty">
             <p className="small-quote">“Speak, and the tower will answer.”</p>
             <p className="hint">
               Loose English on the left becomes formal Babel here. Watch the translation
-              happen as you talk.
+              happen as you talk — or as you type.
             </p>
           </div>
         )}
-        {mode !== 'editor' && interpretation && (
-          <div className="assembly">
+        {interpretation && (
+          <div className="assembly" key={revealKey}>
             {lines.map((line, idx) =>
               line.isBlank ? (
                 <div key={line.id} className="asm-blank" />

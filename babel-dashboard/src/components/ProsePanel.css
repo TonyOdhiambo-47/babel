@@ -1,0 +1,28 @@
+.prose-body {
+  padding: 0;
+  display: flex;
+}
+
+.prose-input {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 18px 22px;
+  font-family: var(--font-code);
+  font-size: 1.02rem;
+  line-height: 1.75;
+  color: var(--text-primary);
+  outline: none;
+}
+.prose-input:focus {
+  box-shadow: none;
+  border: 0;
+}
+.prose-input::placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+  line-height: 1.7;
+}

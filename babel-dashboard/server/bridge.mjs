@@ -193,8 +193,11 @@ wss.on('connection', (ws) => {
 
     if (frame.type === 'translate') {
       // A line of loose English the dashboard wants translated.
-      // Pipe it straight into the interpreter's stdin.
-      const line = String(frame.text || '').replace(/\n/g, ' ');
+      // Pipe it straight into the interpreter's stdin. We preserve
+      // newlines by escaping them to \x01 (babel's JSON mode
+      // un-escapes on the other end) — the traveler's paragraph
+      // breaks are how they indicate dedents in flat prose.
+      const line = String(frame.text || '').replace(/\r\n/g, '\n').replace(/\n/g, '\x01');
       if (line.trim().length === 0) return;
       interpreter.stdin.write(line + '\n');
       return;

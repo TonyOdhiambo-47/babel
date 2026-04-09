@@ -2749,9 +2749,11 @@ static const a_page_in_the_book the_book_of_tongues[] = {
 
     /* ---- Verbs of display ---- */
     {"show me",         "Print",            "displaying output"},
+    {"show us",         "Print",            "displaying output"},
     {"show",            "Print",            "displaying output"},
     {"display",         "Print",            "displaying output"},
-    {"tell me",         "Print",            "displaying output"},
+    {"tell me",         "Say",              "speaking a string"},
+    {"tell us",         "Say",              "speaking a string"},
     {"what is",         "Print",            "displaying output"},
     {"what's",          "Print",            "displaying output"},
     {"reveal",          "Print",            "displaying output"},
@@ -2759,6 +2761,9 @@ static const a_page_in_the_book the_book_of_tongues[] = {
     {"output",          "Print",            "displaying output"},
     {"write out",       "Print",            "displaying output"},
     {"spit out",        "Print",            "displaying output"},
+    {"speak",           "Say",              "speaking a string"},
+    {"utter",           "Say",              "speaking a string"},
+    {"pronounce",       "Say",              "speaking a string"},
 
     /* ---- Verbs of computation ---- */
     {"add up",          "the sum of",       "summing values"},
@@ -2884,16 +2889,16 @@ typedef enum {
 } how_well_she_understood;
 
 typedef struct {
-    char the_travelers_words[256];
-    char the_babel_translation[256];
+    char the_travelers_words[4096];
+    char the_babel_translation[16384];
     how_well_she_understood her_confidence;
     char her_reason[160];
 } an_interpretation;
 
 typedef struct {
-    an_interpretation fragments[64];
+    an_interpretation fragments[32];
     int how_many_fragments;
-    char the_reconstructed_babel[4096];
+    char the_reconstructed_babel[16384];
     int has_red_slots;
     int has_yellow_slots;
 } the_interpretation;
@@ -2997,17 +3002,1043 @@ static int she_consults_the_book(const char *in, char *out, int out_size) {
     return used;
 }
 
-/* She breaks the speech at the natural seams: periods, and the
- * little connecting phrases travelers use between thoughts
+/* A small helper: append a nul-terminated string to a growing
+ * output buffer, respecting its capacity. */
+static void she_appends(char *out, int *o, int out_size, const char *s) {
+    while (*s && *o < out_size - 1) out[(*o)++] = *s++;
+}
+
+/* After she has consulted her book, the text may contain two or
+ * three Babel statements strung together with no punctuation —
+ * travelers speak that way. So she scans for the words that can
+ * only start a statement (Let, Print, Say, Set, Change, Remember,
+ * For, While, If) and, whenever one appears mid-sentence with no
+ * period in front of it, she inserts one. She never touches
+ * anything inside quotation marks. */
+
+/* Babel's "if" demands a comparison — "if X is true, ...". But
+ * travelers naturally say "if is_prime" meaning "if is_prime is
+ * true". She spots bareword conditions (a single name after "if"
+ * with no comparison verb before the clause ends) and appends
+ * "is true" to them. A "clause end" is a comma, "do the
+ * following", a period, or end of input. */
+static int she_peek_comparison(const char *s) {
+    /* Returns 1 if s starts with a comparison word/phrase. */
+    static const char *cmps[] = {
+        "equals", "is not equal to", "is equal to", "is not", "is",
+        "does not equal", "is greater than", "is less than",
+        "is greater than or equal to", "is less than or equal to",
+        "is at least", "is at most", "is in", "is not in",
+        "contains", "does not contain", "is divisible by",
+        NULL
+    };
+    for (int k = 0; cmps[k]; k++) {
+        if (she_hears_phrase(s, cmps[k]) > 0) return 1;
+    }
+    return 0;
+}
+
+static void she_fixes_bareword_conditions(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "if");
+                int is_while = 0;
+                if (n == 0) {
+                    n = she_hears_phrase(in + i, "while");
+                    if (n > 0) is_while = 1;
+                }
+                if (n > 0) {
+                    /* Copy the "if"/"while" through. */
+                    for (int k = 0; k < n && o < out_size - 1; k++) out[o++] = in[i++];
+                    while (in[i] == ' ' && o < out_size - 1) out[o++] = in[i++];
+                    /* Read the next bareword. */
+                    int name_start = i;
+                    while (in[i] &&
+                           ((in[i] >= 'a' && in[i] <= 'z') ||
+                            (in[i] >= 'A' && in[i] <= 'Z') ||
+                            (in[i] >= '0' && in[i] <= '9') ||
+                            in[i] == '_')) i++;
+                    int name_len = i - name_start;
+                    /* Write it through. */
+                    for (int k = 0; k < name_len && o < out_size - 1; k++)
+                        out[o++] = in[name_start + k];
+                    /* Skip spaces. */
+                    int j = i;
+                    while (in[j] == ' ') j++;
+                    /* Is the next thing a clause-end marker (comma,
+                     * period, newline, "do the following") rather
+                     * than a comparison? If so, append "is true". */
+                    int is_clause_end =
+                        in[j] == ',' || in[j] == '.' || in[j] == '\n' ||
+                        in[j] == '\r' || in[j] == '\0' ||
+                        she_hears_phrase(in + j, "do the following") > 0;
+                    if (name_len > 0 && is_clause_end && !she_peek_comparison(in + j)) {
+                        /* Don't append if the name is a number literal
+                         * (e.g. "if 1" — probably means "while 1" etc.)
+                         * — a bareword starting with a letter is what
+                         * we want. */
+                        char first = in[name_start];
+                        if ((first >= 'a' && first <= 'z') ||
+                            (first >= 'A' && first <= 'Z') || first == '_') {
+                            she_appends(out, &o, out_size, " is true");
+                        }
+                    }
+                    (void)is_while;
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* A tiny helper — is the word starting at s (case-insensitive
+ * lowercase, word-boundary already verified by caller) one of the
+ * Babel statement-starter keywords that would end the value of a
+ * shorthand declaration? "let x equal 5 while ..." — "while" is
+ * the end of the value. */
+static int she_at_statement_starter(const char *s) {
+    static const char *starters[] = {
+        "while", "for every", "for each", "if ", "otherwise",
+        "remember", "change", "set ", "print ", "say ",
+        "let there be", "to ",
+        NULL
+    };
+    for (int k = 0; starters[k]; k++) {
+        if (she_hears_phrase(s, starters[k]) > 0) return 1;
+    }
+    return 0;
+}
+
+/* Travelers say "let X equal 5" or "let x be true" or "let msg
+ * = hello there" — shorthand for Babel's full declaration
+ * "let there be a number called \"X\" that equals 5.". This pass
+ * detects the shorthand and expands it to the full form, inferring
+ * the kind from the value that follows. It runs before the book
+ * of tongues has touched value words like "true"/"zero" — but
+ * actually, placement is tricky; we place it AFTER the book so
+ * value words like "zero" have already become "0". */
+static void she_expands_shorthand_decls(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "let");
+                if (n > 0) {
+                    /* Peek the next word. If it's "there", this is
+                     * already the full form — leave it alone. */
+                    int j = i + n;
+                    while (in[j] == ' ') j++;
+                    if (she_hears_phrase(in + j, "there") > 0) {
+                        /* not a shorthand, pass through */
+                        out[o++] = in[i++];
+                        continue;
+                    }
+                    /* Read the bareword name. */
+                    int name_start = j;
+                    while ((in[j] >= 'a' && in[j] <= 'z') ||
+                           (in[j] >= 'A' && in[j] <= 'Z') ||
+                           (in[j] >= '0' && in[j] <= '9') ||
+                           in[j] == '_') j++;
+                    int name_end = j;
+                    if (name_end == name_start) {
+                        out[o++] = in[i++];
+                        continue;
+                    }
+                    while (in[j] == ' ') j++;
+                    /* Check for an equals-like connector. */
+                    int op_n = 0;
+                    if ((op_n = she_hears_phrase(in + j, "equals")) > 0) ;
+                    else if ((op_n = she_hears_phrase(in + j, "equal")) > 0) ;
+                    else if ((op_n = she_hears_phrase(in + j, "be")) > 0) ;
+                    else if ((op_n = she_hears_phrase(in + j, "is")) > 0) ;
+                    else if (in[j] == '=') { op_n = 1; }
+                    if (op_n == 0) {
+                        out[o++] = in[i++];
+                        continue;
+                    }
+                    j += op_n;
+                    while (in[j] == ' ') j++;
+                    int value_start = j;
+                    /* Read the value until punctuation or the next
+                     * statement-starter. */
+                    int value_end = j;
+                    while (in[value_end] &&
+                           in[value_end] != '.' &&
+                           in[value_end] != ',' &&
+                           in[value_end] != ';' &&
+                           in[value_end] != '\n' &&
+                           in[value_end] != '\r') {
+                        char vp = value_end > 0 ? in[value_end-1] : ' ';
+                        int vaws = !((vp >= 'a' && vp <= 'z') || (vp >= 'A' && vp <= 'Z'));
+                        if (vaws && she_at_statement_starter(in + value_end)) break;
+                        /* Also stop at "then" / "and" connectors. */
+                        if (vaws && (she_hears_phrase(in + value_end, "then") > 0 ||
+                                     she_hears_phrase(in + value_end, "and") > 0)) break;
+                        value_end++;
+                    }
+                    while (value_end > value_start &&
+                           (in[value_end-1] == ' ' || in[value_end-1] == '\t' ||
+                            in[value_end-1] == ','))
+                        value_end--;
+                    if (value_end == value_start) {
+                        out[o++] = in[i++];
+                        continue;
+                    }
+                    /* Infer the kind from the value. */
+                    const char *kind = "number";
+                    if (in[value_start] == '"') {
+                        kind = "word";
+                    } else if (she_hears_phrase(in + value_start, "true") > 0 ||
+                               she_hears_phrase(in + value_start, "false") > 0) {
+                        kind = "truth";
+                    } else if (she_hears_phrase(in + value_start, "empty") > 0) {
+                        /* "let X equal empty" is rare — assume list. */
+                        kind = "list";
+                    }
+                    /* Emit the full-form declaration. */
+                    she_appends(out, &o, out_size, "let there be a ");
+                    she_appends(out, &o, out_size, kind);
+                    she_appends(out, &o, out_size, " called \"");
+                    for (int k = name_start; k < name_end && o < out_size - 1; k++)
+                        out[o++] = in[k];
+                    she_appends(out, &o, out_size, "\" that ");
+                    if (!strcmp(kind, "list")) {
+                        she_appends(out, &o, out_size, "begins ");
+                    } else {
+                        she_appends(out, &o, out_size, "equals ");
+                    }
+                    for (int k = value_start; k < value_end && o < out_size - 1; k++)
+                        out[o++] = in[k];
+                    i = value_end;
+                    /* Swallow any trailing comma/space after the
+                     * value — we're closing the declaration ourselves
+                     * and don't want the traveler's comma landing in
+                     * the emitted output. */
+                    while (in[i] == ',' || in[i] == ' ' || in[i] == '\t') i++;
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Context-aware quoting for say/print arguments.
+ *
+ * Travelers say "say all done" meaning the string "all done", and
+ * they say "say count" meaning the value of the variable count.
+ * The Interpreter can tell these apart by tracking which names
+ * have been declared so far — a name introduced via `called "X"`
+ * or `for every X in/from` is a known variable; anything else is
+ * probably a string literal.
+ *
+ * Rule (applied only to say/print arguments):
+ *   - If the argument is already quoted → leave alone.
+ *   - If the argument starts with a digit → it's an expression,
+ *     leave alone.
+ *   - Otherwise read consecutive barewords. If any word is a known
+ *     name or an operator word (plus, minus, of, length, ...) →
+ *     it's an expression, leave alone.
+ *   - Otherwise (all barewords unknown, no operators) → wrap the
+ *     run in quotes.
+ *
+ * This lets "say count" stay as a variable reference when `count`
+ * was declared, while "say hello world" auto-quotes. */
+static int she_word_equals(const char *text, int len, const char *needle) {
+    int nlen = (int)strlen(needle);
+    if (len != nlen) return 0;
+    for (int k = 0; k < len; k++) {
+        char a = text[k], b = needle[k];
+        if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+        if (a != b) return 0;
+    }
+    return 1;
+}
+
+static void she_quotes_unknown_say_args(const char *in, char *out, int out_size) {
+    /* First sweep: collect declared names. */
+    char names[64][64];
+    int name_count = 0;
+    {
+        int i = 0, inq = 0;
+        while (in[i] && name_count < 64) {
+            if (in[i] == '"') { inq = !inq; i++; continue; }
+            if (!inq) {
+                char prev = i > 0 ? in[i-1] : ' ';
+                int aws = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+                if (aws) {
+                    int n;
+                    int ns = -1, ne = -1;
+                    int consumed = 0;
+                    if ((n = she_hears_phrase(in + i, "called")) > 0) {
+                        int j = i + n;
+                        while (in[j] == ' ') j++;
+                        if (in[j] == '"') {
+                            j++;
+                            ns = j;
+                            while (in[j] && in[j] != '"') j++;
+                            ne = j;
+                            if (in[j] == '"') j++;
+                        } else {
+                            ns = j;
+                            while ((in[j] >= 'a' && in[j] <= 'z') ||
+                                   (in[j] >= 'A' && in[j] <= 'Z') ||
+                                   (in[j] >= '0' && in[j] <= '9') || in[j] == '_') j++;
+                            ne = j;
+                        }
+                        consumed = j - i;
+                    } else if ((n = she_hears_phrase(in + i, "for every")) > 0 ||
+                               (n = she_hears_phrase(in + i, "for each")) > 0) {
+                        int j = i + n;
+                        while (in[j] == ' ') j++;
+                        ns = j;
+                        while ((in[j] >= 'a' && in[j] <= 'z') ||
+                               (in[j] >= 'A' && in[j] <= 'Z') ||
+                               (in[j] >= '0' && in[j] <= '9') || in[j] == '_') j++;
+                        ne = j;
+                        consumed = j - i;
+                    }
+                    if (ns >= 0 && ne > ns && ne - ns < 63) {
+                        int dup = 0;
+                        for (int k = 0; k < name_count; k++) {
+                            if ((int)strlen(names[k]) == ne - ns &&
+                                !strncmp(names[k], in + ns, ne - ns)) {
+                                dup = 1; break;
+                            }
+                        }
+                        if (!dup) {
+                            memcpy(names[name_count], in + ns, ne - ns);
+                            names[name_count][ne - ns] = '\0';
+                            name_count++;
+                        }
+                        i += consumed;
+                        continue;
+                    }
+                }
+            }
+            i++;
+        }
+    }
+
+    static const char *op_words[] = {
+        "plus", "minus", "times", "divided", "modulo", "mod",
+        "greater", "less", "than", "not", "equals", "of",
+        "length", "sum", "separated", "by", "and", "or",
+        "the", "a", "an", "item", "items", "first", "last",
+        NULL
+    };
+
+    /* Second sweep: walk, intercept say/print args. */
+    int o = 0, i = 0, inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = i > 0 ? in[i-1] : ' ';
+            int aws = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (aws) {
+                int n = she_hears_phrase(in + i, "say");
+                if (n == 0) n = she_hears_phrase(in + i, "print");
+                if (n > 0) {
+                    /* Copy the keyword through. */
+                    for (int k = 0; k < n && o < out_size - 1; k++) out[o++] = in[i++];
+                    while (in[i] == ' ' && o < out_size - 1) out[o++] = in[i++];
+                    /* Bail conditions: already quoted, empty, numeric. */
+                    if (in[i] == '"' || in[i] == '\0' || in[i] == '.' ||
+                        in[i] == '\n' || in[i] == '\r' || in[i] == ',' ||
+                        (in[i] >= '0' && in[i] <= '9')) {
+                        continue;
+                    }
+                    /* Scan ahead: read words until punctuation. */
+                    int scan_start = i;
+                    int scan_end = i;
+                    int word_count = 0;
+                    int expression = 0;
+                    int j = i;
+                    while (in[j] && in[j] != '.' && in[j] != '\n' &&
+                           in[j] != '\r' && in[j] != ',' && in[j] != '"' &&
+                           in[j] != ':' && in[j] != ';') {
+                        while (in[j] == ' ' || in[j] == '\t') j++;
+                        if (!in[j] || in[j] == '.' || in[j] == '\n' ||
+                            in[j] == '\r' || in[j] == ',' || in[j] == '"' ||
+                            in[j] == ':' || in[j] == ';') break;
+                        /* A digit anywhere → expression. */
+                        if (in[j] >= '0' && in[j] <= '9') { expression = 1; break; }
+                        int wstart = j;
+                        while ((in[j] >= 'a' && in[j] <= 'z') ||
+                               (in[j] >= 'A' && in[j] <= 'Z') ||
+                               (in[j] >= '0' && in[j] <= '9') || in[j] == '_') j++;
+                        int wlen = j - wstart;
+                        if (wlen == 0) { expression = 1; break; }
+                        /* Is this word an operator word? */
+                        int is_op = 0;
+                        for (int k = 0; op_words[k]; k++) {
+                            if (she_word_equals(in + wstart, wlen, op_words[k])) {
+                                is_op = 1; break;
+                            }
+                        }
+                        if (is_op) { expression = 1; break; }
+                        /* Is this word a known declared name? */
+                        int is_known = 0;
+                        for (int k = 0; k < name_count; k++) {
+                            if (she_word_equals(in + wstart, wlen, names[k])) {
+                                is_known = 1; break;
+                            }
+                        }
+                        if (is_known) { expression = 1; break; }
+                        word_count++;
+                        scan_end = j;
+                    }
+                    if (!expression && word_count >= 1) {
+                        /* Wrap the run in quotes — and title-case
+                         * the words inside, since the user meant a
+                         * literal string and the lowercase pipeline
+                         * already stripped their casing. */
+                        if (o < out_size - 1) out[o++] = '"';
+                        int capitalize_next = 1;
+                        for (int k = scan_start; k < scan_end && o < out_size - 1; k++) {
+                            char c = in[k];
+                            if (capitalize_next && c >= 'a' && c <= 'z') {
+                                c = (char)(c - 'a' + 'A');
+                                capitalize_next = 0;
+                            } else if (c == ' ') {
+                                capitalize_next = 1;
+                            } else {
+                                capitalize_next = 0;
+                            }
+                            out[o++] = c;
+                        }
+                        if (o < out_size - 1) out[o++] = '"';
+                        i = scan_end;
+                    }
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Travelers rarely think in Babel's four kinds (number, word,
+ * truth, list). They say "variable", "value", "thing" instead.
+ * She infers the kind from the value that follows: true/false →
+ * truth, a quoted string → word, "begins empty" → list, anything
+ * else → number (the safest default). She only rewrites a kind
+ * word if it's one of the loose ones; explicit kinds stay. */
+static void she_infers_kind(const char *in, char *out, int out_size) {
+    static const char *loose_kinds[] = {
+        "variable", "value", "thing", NULL
+    };
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int matched_len = 0;
+                for (int k = 0; loose_kinds[k]; k++) {
+                    int n = she_hears_phrase(in + i, loose_kinds[k]);
+                    if (n > 0) { matched_len = n; break; }
+                }
+                if (matched_len > 0) {
+                    /* Look ahead: "called NAME that equals/begins VALUE"
+                     * — skim to the value and infer. */
+                    int j = i + matched_len;
+                    while (in[j] == ' ') j++;
+                    int kind_is = 0; /* 0=number, 1=word, 2=truth, 3=list */
+                    int called_n = she_hears_phrase(in + j, "called");
+                    if (called_n > 0) {
+                        j += called_n;
+                        while (in[j] == ' ') j++;
+                        /* Skip the name (bareword or quoted). */
+                        if (in[j] == '"') {
+                            j++;
+                            while (in[j] && in[j] != '"') j++;
+                            if (in[j] == '"') j++;
+                        } else {
+                            while (in[j] &&
+                                   ((in[j] >= 'a' && in[j] <= 'z') ||
+                                    (in[j] >= 'A' && in[j] <= 'Z') ||
+                                    (in[j] >= '0' && in[j] <= '9') ||
+                                    in[j] == '_')) j++;
+                        }
+                        while (in[j] == ' ') j++;
+                        /* Optional "that". */
+                        int that_n = she_hears_phrase(in + j, "that");
+                        if (that_n > 0) { j += that_n; while (in[j] == ' ') j++; }
+                        int begins_n = she_hears_phrase(in + j, "begins");
+                        int equals_n = she_hears_phrase(in + j, "equals");
+                        if (begins_n > 0) {
+                            j += begins_n;
+                            while (in[j] == ' ') j++;
+                            if (she_hears_phrase(in + j, "empty") > 0) {
+                                kind_is = 3; /* list */
+                            }
+                        } else if (equals_n > 0) {
+                            j += equals_n;
+                            while (in[j] == ' ') j++;
+                            if (she_hears_phrase(in + j, "true") > 0 ||
+                                she_hears_phrase(in + j, "false") > 0) {
+                                kind_is = 2; /* truth */
+                            } else if (in[j] == '"') {
+                                kind_is = 1; /* word */
+                            } else {
+                                kind_is = 0; /* number (default) */
+                            }
+                        }
+                    }
+                    const char *replacement =
+                        kind_is == 1 ? "word" :
+                        kind_is == 2 ? "truth" :
+                        kind_is == 3 ? "list" : "number";
+                    she_appends(out, &o, out_size, replacement);
+                    i += matched_len;
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Travelers naturally say "if X then Y" and "while X then Y". In
+ * Babel the correct form is "if X, Y" (single-statement body). So
+ * she walks the text and whenever the current statement started
+ * with "if" or "while", she replaces the bareword "then" with ", ".
+ * Outside of a conditional, "then" is just a sequencing word and
+ * becomes a sentence boundary instead. */
+static void she_fixes_then(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    /* Track whether the current statement (since the last period
+     * or newline) started with "if" or "while". */
+    int stmt_is_conditional = 0;
+    int stmt_start = 1;  /* the next word starts a new statement */
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            if (in[i] == '.' || in[i] == '\n' || in[i] == '\r') {
+                out[o++] = in[i++];
+                stmt_start = 1;
+                stmt_is_conditional = 0;
+                continue;
+            }
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start && stmt_start &&
+                (in[i] >= 'A' || in[i] == ' ')) {
+                /* Skip leading whitespace, check if this statement
+                 * starts with "if" or "while". */
+                int j = i;
+                while (in[j] == ' ' || in[j] == '\t') j++;
+                if (she_hears_phrase(in + j, "if") > 0 ||
+                    she_hears_phrase(in + j, "while") > 0) {
+                    stmt_is_conditional = 1;
+                }
+                if (in[i] != ' ' && in[i] != '\t') stmt_start = 0;
+            }
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "then");
+                if (n > 0) {
+                    /* Trim trailing spaces we just wrote. */
+                    while (o > 0 && out[o-1] == ' ') o--;
+                    if (stmt_is_conditional) {
+                        if (o < out_size - 1) out[o++] = ',';
+                        if (o < out_size - 1) out[o++] = ' ';
+                    } else {
+                        if (o < out_size - 1) out[o++] = '.';
+                        if (o < out_size - 1) out[o++] = '\n';
+                        stmt_is_conditional = 0;
+                        stmt_start = 1;
+                    }
+                    i += n;
+                    while (in[i] == ' ' || in[i] == '\t') i++;
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+static void she_splits_on_keywords(const char *in, char *out, int out_size) {
+    /* Ordered longest-first so multi-word starters ("Let there be",
+     * "For every") match before their one-word prefixes. */
+    static const char *starters[] = {
+        "Let there be", "For every", "For each",
+        "Otherwise", "Remember", "Change", "Print", "Say",
+        "Set", "While", "If",
+        NULL
+    };
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                /* longest match first */
+                int best_n = 0;
+                for (int k = 0; starters[k]; k++) {
+                    int n = she_hears_phrase(in + i, starters[k]);
+                    if (n > best_n) best_n = n;
+                }
+                if (best_n > 0 && o > 0) {
+                    /* Look back at the most recent non-space char
+                     * we've written. If it's already a sentence
+                     * boundary, do nothing. Otherwise insert ". ". */
+                    int b = o - 1;
+                    while (b >= 0 && (out[b] == ' ' || out[b] == '\t')) b--;
+                    if (b >= 0) {
+                        char c = out[b];
+                        if (c != '.' && c != ',' && c != ';' && c != ':' && c != '\n') {
+                            /* trim any trailing spaces first */
+                            while (o > 0 && (out[o-1] == ' ' || out[o-1] == '\t')) o--;
+                            /* Trim trailing " and" / " then" if the
+                             * previous statement ended with a dangling
+                             * connector. */
+                            for (;;) {
+                                if (o >= 4 &&
+                                    (out[o-4] == ' ' || out[o-4] == '\t') &&
+                                    (out[o-3] == 'a' || out[o-3] == 'A') &&
+                                    (out[o-2] == 'n' || out[o-2] == 'N') &&
+                                    (out[o-1] == 'd' || out[o-1] == 'D')) {
+                                    o -= 4;
+                                    while (o > 0 && (out[o-1] == ' ' || out[o-1] == '\t')) o--;
+                                    continue;
+                                }
+                                if (o >= 5 &&
+                                    (out[o-5] == ' ' || out[o-5] == '\t') &&
+                                    (out[o-4] == 't' || out[o-4] == 'T') &&
+                                    (out[o-3] == 'h' || out[o-3] == 'H') &&
+                                    (out[o-2] == 'e' || out[o-2] == 'E') &&
+                                    (out[o-1] == 'n' || out[o-1] == 'N')) {
+                                    o -= 5;
+                                    while (o > 0 && (out[o-1] == ' ' || out[o-1] == '\t')) o--;
+                                    continue;
+                                }
+                                break;
+                            }
+                            if (o < out_size - 1) out[o++] = '.';
+                            if (o < out_size - 1) out[o++] = '\n';
+                            /* Swallow any spaces right after the seam
+                             * so the next line starts cleanly. */
+                            while (in[i] == ' ' || in[i] == '\t') i++;
+                        }
+                    }
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* A small courtesy the Interpreter performs after consulting her
+ * book: when the traveler says "a number called score equals 10",
+ * she knows the tower wants the name in quotes — "score" — and
+ * she knows the tower expects the word "that" before "equals" or
+ * "begins" in a declaration. So she quietly supplies both. She
+ * leaves anything already quoted alone, and she doesn't add
+ * "that" if it's already there. */
+static void she_quotes_names_after_called(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        /* Look for the word "called" at a word boundary, followed
+         * by spaces and then a bareword (not already quoted). */
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "called");
+                if (n > 0) {
+                    /* copy "called" through */
+                    for (int k = 0; k < n && o < out_size - 1; k++) out[o++] = in[i++];
+                    /* pass through any spaces */
+                    while (in[i] == ' ' && o < out_size - 1) out[o++] = in[i++];
+                    /* if the next char starts a bareword, wrap it */
+                    if (in[i] && in[i] != '"' &&
+                        ((in[i] >= 'a' && in[i] <= 'z') ||
+                         (in[i] >= 'A' && in[i] <= 'Z') ||
+                         in[i] == '_')) {
+                        if (o < out_size - 1) out[o++] = '"';
+                        while (in[i] &&
+                               ((in[i] >= 'a' && in[i] <= 'z') ||
+                                (in[i] >= 'A' && in[i] <= 'Z') ||
+                                (in[i] >= '0' && in[i] <= '9') ||
+                                in[i] == '_')) {
+                            if (o < out_size - 1) out[o++] = in[i++];
+                            else i++;
+                        }
+                        if (o < out_size - 1) out[o++] = '"';
+                    }
+                    /* Now look ahead past any spaces: if the next
+                     * word is "equals" or "begins" (but not already
+                     * preceded by "that"), insert "that " before
+                     * it. The parser requires it. */
+                    int j = i;
+                    while (in[j] == ' ') j++;
+                    int eq = she_hears_phrase(in + j, "equals");
+                    int bg = she_hears_phrase(in + j, "begins");
+                    if (eq > 0 || bg > 0) {
+                        /* flush the spaces first so "called \"x\" that equals" reads cleanly */
+                        while (in[i] == ' ' && o < out_size - 1) out[o++] = in[i++];
+                        she_appends(out, &o, out_size, "that ");
+                    }
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Insert the comma and colon the tower expects around block
+ * openers. "for every x from 1 to 5 do the following" becomes
+ * "for every x from 1 to 5, do the following:". Same for while
+ * and if. If the punctuation is already there, leave it alone. */
+static void she_punctuates_blocks(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "do the following");
+                if (n > 0) {
+                    /* Ensure a comma precedes it. Trim any trailing
+                     * spaces from out, check last non-space: if it's
+                     * not already a comma, insert ", ". */
+                    int b = o - 1;
+                    while (b >= 0 && out[b] == ' ') b--;
+                    if (b >= 0 && out[b] != ',' && out[b] != '\n') {
+                        while (o > 0 && out[o-1] == ' ') o--;
+                        if (o < out_size - 1) out[o++] = ',';
+                        if (o < out_size - 1) out[o++] = ' ';
+                    }
+                    /* Copy "do the following" through. */
+                    for (int k = 0; k < n && o < out_size - 1; k++) out[o++] = in[i++];
+                    /* Look ahead past spaces: if the next char is
+                     * not already a colon, insert one. Then insert
+                     * a newline so the block body starts on a new
+                     * logical line — the indent pass will pick it
+                     * up from there. */
+                    int j = i;
+                    while (in[j] == ' ') j++;
+                    if (in[j] != ':') {
+                        if (o < out_size - 1) out[o++] = ':';
+                    } else {
+                        if (o < out_size - 1) out[o++] = ':';
+                        i = j + 1;
+                    }
+                    if (o < out_size - 1) out[o++] = '\n';
+                    /* Swallow any spaces at the start of the body. */
+                    while (in[i] == ' ' || in[i] == '\t') i++;
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Handle the small "separated by X" hint. Babel wants
+ * "Print primes, separated by \",\"." — a comma before, and the
+ * separator as a quoted string. The traveler usually says
+ * "separated by comma" or "by space" or "by newline". She
+ * translates those words into quoted literals, and inserts the
+ * comma if it's missing. */
+static void she_fixes_separated_by(const char *in, char *out, int out_size) {
+    int o = 0;
+    int i = 0;
+    int inside_quotes = 0;
+    while (in[i] && o < out_size - 1) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            out[o++] = in[i++];
+            continue;
+        }
+        if (!inside_quotes) {
+            char prev = (i > 0) ? in[i-1] : ' ';
+            int at_word_start = !((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z'));
+            if (at_word_start) {
+                int n = she_hears_phrase(in + i, "separated by");
+                if (n > 0) {
+                    /* Ensure a comma precedes it. */
+                    int b = o - 1;
+                    while (b >= 0 && out[b] == ' ') b--;
+                    if (b >= 0 && out[b] != ',' && out[b] != '\n') {
+                        while (o > 0 && out[o-1] == ' ') o--;
+                        if (o < out_size - 1) out[o++] = ',';
+                        if (o < out_size - 1) out[o++] = ' ';
+                    }
+                    /* Copy "separated by" through. */
+                    for (int k = 0; k < n && o < out_size - 1; k++) out[o++] = in[i++];
+                    /* Skip spaces, then rewrite the separator word
+                     * into a quoted literal if it's bare. */
+                    while (in[i] == ' ' && o < out_size - 1) out[o++] = in[i++];
+                    if (in[i] == '"') {
+                        /* already quoted, leave alone */
+                        continue;
+                    }
+                    /* Read the next word. */
+                    char word[64];
+                    int w = 0;
+                    while (in[i] &&
+                           ((in[i] >= 'a' && in[i] <= 'z') ||
+                            (in[i] >= 'A' && in[i] <= 'Z')) &&
+                           w < (int)sizeof(word) - 1) {
+                        word[w++] = in[i++];
+                    }
+                    word[w] = '\0';
+                    /* Map common separator words to their literal. */
+                    const char *lit = NULL;
+                    if (w > 0) {
+                        /* lowercase compare */
+                        char lc[64];
+                        for (int k = 0; k < w; k++) {
+                            char c = word[k];
+                            if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+                            lc[k] = c;
+                        }
+                        lc[w] = '\0';
+                        if      (!strcmp(lc, "comma"))    lit = "\",\"";
+                        else if (!strcmp(lc, "commas"))   lit = "\",\"";
+                        else if (!strcmp(lc, "space"))    lit = "\" \"";
+                        else if (!strcmp(lc, "spaces"))   lit = "\" \"";
+                        else if (!strcmp(lc, "newline"))  lit = "\"\\n\"";
+                        else if (!strcmp(lc, "newlines")) lit = "\"\\n\"";
+                        else if (!strcmp(lc, "dash"))     lit = "\" - \"";
+                        else if (!strcmp(lc, "dashes"))   lit = "\" - \"";
+                        else if (!strcmp(lc, "pipe"))     lit = "\" | \"";
+                        else if (!strcmp(lc, "tab"))      lit = "\"\\t\"";
+                    }
+                    if (lit) {
+                        she_appends(out, &o, out_size, lit);
+                    } else {
+                        /* Unknown word — leave it untouched */
+                        for (int k = 0; k < w && o < out_size - 1; k++) out[o++] = word[k];
+                    }
+                    continue;
+                }
+            }
+        }
+        out[o++] = in[i++];
+    }
+    out[o] = '\0';
+}
+
+/* Babel is indentation-sensitive — block bodies live on their own
+ * lines, indented one level past the opener. When the traveler
+ * speaks a single run-on paragraph, the Interpreter's other passes
+ * produce statements separated by periods with no indentation
+ * cues. This pass walks the split output and reflows it: each
+ * statement on its own line, each "do the following:" opens a
+ * block that indents everything after it by four more spaces, and
+ * when she sees a new top-level verb that clearly cannot belong
+ * to the current block (like "Print" after the loop body — a
+ * heuristic based on the traveler's own statement order), she
+ * dedents back to the previous level.
+ *
+ * Because flat prose is genuinely ambiguous about where a nested
+ * block ends, the Interpreter uses a simple rule: every statement
+ * after a block-opener is assumed to be part of that block's
+ * body, monotonically nesting. If the traveler wants an
+ * un-nested statement at the end (like a final Print), she should
+ * put a period or a newline before it in the prose — or the
+ * traveler can use the Conversation overlay to edit. */
+static int she_statement_ends_with_following_colon(const char *stmt) {
+    int L = (int)strlen(stmt);
+    /* Trim trailing spaces. */
+    while (L > 0 && (stmt[L-1] == ' ' || stmt[L-1] == '\t')) L--;
+    if (L == 0) return 0;
+    if (stmt[L-1] != ':') return 0;
+    /* Look back for "following" just before the colon. */
+    const char *needle = "following";
+    int nL = (int)strlen(needle);
+    if (L - 1 - nL < 0) return 0;
+    for (int k = 0; k < nL; k++) {
+        char a = stmt[L - 1 - nL + k];
+        char b = needle[k];
+        if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+        if (a != b) return 0;
+    }
+    return 1;
+}
+
+static void she_indents_blocks(const char *in, char *out, int out_size) {
+    /* Walk the input, carving it into statements at every period
+     * or newline that falls outside quotes. Each statement is
+     * emitted on its own line at the current indent level. After
+     * a block-opener ("...do the following:"), the next statement
+     * gets indented one level deeper. */
+    int o = 0;
+    int depth = 0;
+    char stmt[2400];
+    int sL = 0;
+    int inside_quotes = 0;
+    int i = 0;
+    #define FLUSH_STMT() do {                                              \
+        /* trim leading & trailing whitespace from stmt */                 \
+        int a = 0;                                                         \
+        while (a < sL && (stmt[a] == ' ' || stmt[a] == '\t')) a++;         \
+        int b = sL;                                                        \
+        while (b > a && (stmt[b-1] == ' ' || stmt[b-1] == '\t')) b--;      \
+        if (b > a) {                                                       \
+            for (int k = 0; k < depth && o < out_size - 1; k++)            \
+                out[o++] = ' ';                                            \
+            /* Capitalize the first letter of each statement —             \
+             * Babel keywords are case-sensitive at the start of a         \
+             * sentence ("Let", "Print", "For", "If"...). */               \
+            int first_written = 0;                                         \
+            for (int k = a; k < b && o < out_size - 1; k++) {              \
+                char c = stmt[k];                                          \
+                if (!first_written && c >= 'a' && c <= 'z')                \
+                    c = (char)(c - 'a' + 'A');                             \
+                if (c != ' ' && c != '\t') first_written = 1;              \
+                out[o++] = c;                                              \
+            }                                                              \
+            /* Don't add a period after a block opener (ends in ":") */    \
+            if (b > a && stmt[b-1] != ':' && o < out_size - 1)             \
+                out[o++] = '.';                                            \
+            if (o < out_size - 1) out[o++] = '\n';                         \
+            stmt[b] = '\0';                                                \
+            if (she_statement_ends_with_following_colon(stmt + a))         \
+                depth += 4;                                                \
+        }                                                                  \
+        sL = 0;                                                            \
+    } while (0)
+
+    while (in[i]) {
+        if (in[i] == '"') {
+            inside_quotes = !inside_quotes;
+            if (sL < (int)sizeof(stmt) - 1) stmt[sL++] = in[i];
+            i++;
+            continue;
+        }
+        if (!inside_quotes && (in[i] == '.' || in[i] == '\n' || in[i] == '\r')) {
+            FLUSH_STMT();
+            /* Blank lines in the input are the traveler's way of
+             * dedenting out of a block. Each blank line pops one
+             * level — so two blank lines pop two levels. This
+             * lets flat prose with paragraph breaks still carve
+             * out the right nesting structure. */
+            if (in[i] == '\n' || in[i] == '\r') {
+                int j = i + 1;
+                int blanks = 0;
+                while (1) {
+                    int k = j;
+                    while (in[k] == ' ' || in[k] == '\t') k++;
+                    if (in[k] == '\n' || in[k] == '\r') {
+                        blanks++;
+                        j = k + 1;
+                    } else {
+                        break;
+                    }
+                }
+                if (blanks > 0) {
+                    depth -= 4 * blanks;
+                    if (depth < 0) depth = 0;
+                    i = j;
+                    continue;
+                }
+            }
+            i++;
+            continue;
+        }
+        if (sL < (int)sizeof(stmt) - 1) stmt[sL++] = in[i];
+        i++;
+    }
+    FLUSH_STMT();
+    /* Strip the trailing newline, if any — the caller appends its
+     * own period. Actually we emit periods per statement, so the
+     * caller's "%s." will produce an extra period on a blank line.
+     * To avoid that, drop the trailing "\n" and the eventual extra
+     * "." becomes a harmless no-op on the last line. */
+    if (o > 0 && out[o-1] == '\n') o--;
+    if (o > 0 && out[o-1] == '.') o--;
+    out[o] = '\0';
+    #undef FLUSH_STMT
+}
+
+/* She breaks the speech at the natural seams: periods, newlines,
+ * and the little connecting phrases travelers use between thoughts
  * ("and then", "then", "after that", "next"). Each seam becomes
  * one Babel sentence. */
-static int she_finds_the_seams(const char *in, char segments[][512], int max) {
+static int she_finds_the_seams(const char *in, char segments[][2048], int max) {
     static const char *connectors[] = {
         "and then", "after that", "and finally", "finally",
-        "next,", "then,", "also,", NULL
+        "next,", "then,", "also,",
+        /* Bare "then" as a seam too — speech recognition rarely
+         * includes punctuation, so travelers naturally string
+         * sentences together with "then" alone. */
+        "then", NULL
     };
     int n = 0, o = 0;
-    char buf[512];
+    char buf[2048];
     int inside_quotes = 0;
     int i = 0;
     while (in[i] && n < max) {
@@ -3026,24 +4057,25 @@ static int she_finds_the_seams(const char *in, char segments[][512], int max) {
             if (hit) {
                 buf[o] = '\0';
                 if (o > 0) {
-                    strncpy(segments[n], buf, 511);
-                    segments[n][511] = '\0';
+                    strncpy(segments[n], buf, 2047);
+                    segments[n][2047] = '\0';
                     n++;
                 }
                 o = 0;
-                while (in[i] == ' ' || in[i] == ',' || in[i] == '.') i++;
+                while (in[i] == ' ' || in[i] == ',' || in[i] == '.' || in[i] == '\n' || in[i] == '\r') i++;
                 continue;
             }
-            if (in[i] == '.') {
+            /* Periods and newlines both close a segment. */
+            if (in[i] == '.' || in[i] == '\n' || in[i] == '\r') {
                 buf[o] = '\0';
                 if (o > 0) {
-                    strncpy(segments[n], buf, 511);
-                    segments[n][511] = '\0';
+                    strncpy(segments[n], buf, 2047);
+                    segments[n][2047] = '\0';
                     n++;
                 }
                 o = 0;
                 i++;
-                while (in[i] == ' ') i++;
+                while (in[i] == ' ' || in[i] == '\n' || in[i] == '\r' || in[i] == '\t') i++;
                 continue;
             }
         }
@@ -3052,8 +4084,8 @@ static int she_finds_the_seams(const char *in, char segments[][512], int max) {
     }
     if (o > 0 && n < max) {
         buf[o] = '\0';
-        strncpy(segments[n], buf, 511);
-        segments[n][511] = '\0';
+        strncpy(segments[n], buf, 2047);
+        segments[n][2047] = '\0';
         n++;
     }
     /* Trim trailing/leading whitespace on each segment. */
@@ -3114,40 +4146,170 @@ static the_interpretation the_interpreter_listens(const char *the_travelers_spee
     the_interpretation result;
     memset(&result, 0, sizeof(result));
 
-    char cleaned[4096];
-    she_removes_the_filler(the_travelers_speech, cleaned, sizeof(cleaned));
-
-    char segments[64][512];
-    int n = she_finds_the_seams(cleaned, segments, 64);
-
-    for (int s = 0; s < n && result.how_many_fragments < 64; s++) {
-        an_interpretation *f = &result.fragments[result.how_many_fragments];
-        strncpy(f->the_travelers_words, segments[s], sizeof(f->the_travelers_words) - 1);
-
-        /* Consult the book first — maybe the traveler used some
-         * familiar-but-loose phrasing the Interpreter knows how to
-         * tighten up. */
-        char translated[1024];
-        int used = she_consults_the_book(segments[s], translated, sizeof(translated));
-        char trial[1100];
-        snprintf(trial, sizeof(trial), "%s.", translated);
-
-        /* If the book left the text alone, ask the tower whether
-         * the traveler's own words are already valid Babel. The
-         * tower is a strict judge — it will reject references to
-         * names it has not yet met — but when it says yes, we can
-         * be sure. */
-        if (used == 0 && she_asks_the_tower_quietly(trial)) {
-            strncpy(f->the_babel_translation, trial, sizeof(f->the_babel_translation) - 1);
-            f->her_confidence = UNDERSTOOD_PERFECTLY;
-            strncpy(f->her_reason, "already valid Babel", sizeof(f->her_reason) - 1);
-            result.how_many_fragments++;
-            continue;
+    /* The traveler's casing is unreliable — speech recognition
+     * capitalizes at sentence starts, autocorrect capitalizes
+     * single letters ("N" where they meant "n"), and so on. Babel
+     * identifiers are case-sensitive, so "N" and "n" are different
+     * names. To insulate the traveler from that, we lowercase
+     * everything outside quoted strings before any pass runs.
+     * The indent pass at the end will re-capitalize the first
+     * letter of each statement, which is all Babel cares about.
+     *
+     * But first: a run of two or more consecutive Capitalized
+     * words is probably a proper noun or a phrase the traveler
+     * intends as a string literal ("Lift Off", "New York",
+     * "Happy Birthday"). We wrap those in quotes before the
+     * lowercasing pass so the intent survives. */
+    char lowered[16384];
+    {
+        int o = 0, i = 0, inq = 0;
+        const char *src = the_travelers_speech;
+        while (src[i] && o < (int)sizeof(lowered) - 1) {
+            if (src[i] == '"') {
+                inq = !inq;
+                lowered[o++] = src[i++];
+                continue;
+            }
+            if (!inq) {
+                /* Is this the start of a capitalized word? */
+                char prev = (i > 0) ? src[i-1] : ' ';
+                int at_word_start =
+                    !((prev >= 'a' && prev <= 'z') ||
+                      (prev >= 'A' && prev <= 'Z') ||
+                      (prev >= '0' && prev <= '9') ||
+                      prev == '_');
+                if (at_word_start && src[i] >= 'A' && src[i] <= 'Z') {
+                    /* Scan ahead: how many consecutive capitalized
+                     * words in a row? */
+                    int j = i;
+                    int words = 0;
+                    int last_end = i;
+                    while (src[j] >= 'A' && src[j] <= 'Z') {
+                        int k = j + 1;
+                        while ((src[k] >= 'a' && src[k] <= 'z') ||
+                               (src[k] >= 'A' && src[k] <= 'Z') ||
+                               (src[k] >= '0' && src[k] <= '9') ||
+                               src[k] == '_') k++;
+                        words++;
+                        last_end = k;
+                        /* Skip a single space between words. */
+                        if (src[k] == ' ' && src[k+1] >= 'A' && src[k+1] <= 'Z') {
+                            j = k + 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    if (words >= 2) {
+                        /* Wrap [i, last_end) in quotes, lowercasing
+                         * the content would lose the traveler's
+                         * intent — but the content is a literal, so
+                         * we preserve case inside the quotes. */
+                        if (o < (int)sizeof(lowered) - 1) lowered[o++] = '"';
+                        for (int k = i; k < last_end && o < (int)sizeof(lowered) - 1; k++)
+                            lowered[o++] = src[k];
+                        if (o < (int)sizeof(lowered) - 1) lowered[o++] = '"';
+                        i = last_end;
+                        continue;
+                    }
+                }
+            }
+            char c = src[i++];
+            if (!inq && c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+            lowered[o++] = c;
         }
+        lowered[o] = '\0';
+    }
+    char cleaned[16384];
+    she_removes_the_filler(lowered, cleaned, sizeof(cleaned));
 
-        /* The book did something, or the parser was unhappy. We
-         * take the translation as our best guess and mark it
-         * yellow — the traveler can say "yes" to confirm. */
+    /* Run the entire pipeline on the full cleaned text in one pass.
+     * Earlier versions segmented first and ran the pipeline per
+     * segment — but that destroyed block structure, since "then"
+     * and periods inside a block body became segment boundaries and
+     * the indent pass could no longer see the block as a whole.
+     * Running globally lets "do the following:" nest its body
+     * correctly across what looks locally like sentence seams. */
+    char translated[16384];
+    int used = she_consults_the_book(cleaned, translated, sizeof(translated));
+    char expanded[16384];
+    she_expands_shorthand_decls(translated, expanded, sizeof(expanded));
+    char inferred[16384];
+    she_infers_kind(expanded, inferred, sizeof(inferred));
+    char polished[16384];
+    she_quotes_names_after_called(inferred, polished, sizeof(polished));
+    char sayfixed[16384];
+    she_quotes_unknown_say_args(polished, sayfixed, sizeof(sayfixed));
+    char punctuated[16384];
+    she_punctuates_blocks(sayfixed, punctuated, sizeof(punctuated));
+    char thenned[16384];
+    she_fixes_then(punctuated, thenned, sizeof(thenned));
+    char condfixed[16384];
+    she_fixes_bareword_conditions(thenned, condfixed, sizeof(condfixed));
+    char separated[16384];
+    she_fixes_separated_by(condfixed, separated, sizeof(separated));
+    char split[16384];
+    she_splits_on_keywords(separated, split, sizeof(split));
+    char indented[16384];
+    she_indents_blocks(split, indented, sizeof(indented));
+
+    /* Monotonic indent is the right default — every new statement
+     * after a block-opener joins the block's body — but there's
+     * one idiom it always gets wrong: a final "Say X" or "Print X"
+     * that the traveler tacks onto the end of a program is almost
+     * never inside the last loop; it's the program's concluding
+     * announcement. So: if the last non-empty line starts with
+     * "Say " or "Print " and is currently indented, strip its
+     * indent so it runs at top level. */
+    {
+        int L = (int)strlen(indented);
+        /* Find the start of the last non-empty line. */
+        int end = L;
+        while (end > 0 && (indented[end-1] == '\n' || indented[end-1] == '\r' ||
+                           indented[end-1] == ' ' || indented[end-1] == '\t' ||
+                           indented[end-1] == '.')) end--;
+        int line_start = end;
+        while (line_start > 0 && indented[line_start-1] != '\n') line_start--;
+        /* Skip leading whitespace on that line. */
+        int content = line_start;
+        while (content < L && (indented[content] == ' ' || indented[content] == '\t')) content++;
+        if (content > line_start) {
+            int is_say = she_hears_phrase(indented + content, "Say") > 0 ||
+                         she_hears_phrase(indented + content, "say") > 0;
+            int is_print = she_hears_phrase(indented + content, "Print") > 0 ||
+                           she_hears_phrase(indented + content, "print") > 0;
+            if (is_say || is_print) {
+                /* Remove the spaces between line_start and content. */
+                int removed = content - line_start;
+                memmove(indented + line_start, indented + content,
+                        L - content + 1);
+                (void)removed;
+            }
+        }
+    }
+
+    /* One composite fragment for the UI. A single run-on paragraph
+     * turns into one interpretation the traveler can yes/no, not a
+     * half-dozen fragmentary guesses. */
+    an_interpretation *f = &result.fragments[0];
+    strncpy(f->the_travelers_words, cleaned, sizeof(f->the_travelers_words) - 1);
+
+    char trial[16384];
+    snprintf(trial, sizeof(trial), "%s", indented);
+    /* Append a final period if the last non-space char isn't one. */
+    {
+        int L = (int)strlen(trial);
+        while (L > 0 && (trial[L-1] == ' ' || trial[L-1] == '\n' || trial[L-1] == '\t')) L--;
+        if (L > 0 && trial[L-1] != '.' && L + 1 < (int)sizeof(trial)) {
+            trial[L] = '.';
+            trial[L+1] = '\0';
+        }
+    }
+
+    if (used == 0 && she_asks_the_tower_quietly(trial)) {
+        strncpy(f->the_babel_translation, trial, sizeof(f->the_babel_translation) - 1);
+        f->her_confidence = UNDERSTOOD_PERFECTLY;
+        strncpy(f->her_reason, "already valid Babel", sizeof(f->her_reason) - 1);
+    } else {
         strncpy(f->the_babel_translation, trial, sizeof(f->the_babel_translation) - 1);
         if (used > 0) {
             f->her_confidence = UNDERSTOOD_PROBABLY;
@@ -3160,22 +4322,13 @@ static the_interpretation the_interpreter_listens(const char *the_travelers_spee
                     sizeof(f->her_reason) - 1);
         }
         result.has_yellow_slots = 1;
-        result.how_many_fragments++;
     }
+    result.how_many_fragments = 1;
 
-    /* Assemble whatever we have so far. */
-    result.the_reconstructed_babel[0] = '\0';
-    int rb = 0;
-    for (int i = 0; i < result.how_many_fragments; i++) {
-        const char *t = result.fragments[i].the_babel_translation;
-        if (!t[0]) continue;
-        int L = (int)strlen(t);
-        if (rb + L + 2 >= (int)sizeof(result.the_reconstructed_babel)) break;
-        memcpy(result.the_reconstructed_babel + rb, t, L);
-        rb += L;
-        result.the_reconstructed_babel[rb++] = '\n';
-    }
-    result.the_reconstructed_babel[rb] = '\0';
+    /* The reconstructed Babel is just the single fragment's
+     * translation — no joining needed. */
+    strncpy(result.the_reconstructed_babel, f->the_babel_translation,
+            sizeof(result.the_reconstructed_babel) - 1);
     return result;
 }
 
@@ -3411,10 +4564,16 @@ static void she_writes_a_json_interpretation(FILE *out, const the_interpretation
  * JSON line to stdout. The dashboard uses this to keep up with a
  * speaker in real time. */
 static void she_listens_in_json_mode(void) {
-    char buffer[8192];
+    char buffer[16384];
     while (fgets(buffer, sizeof(buffer), stdin)) {
         buffer[strcspn(buffer, "\n")] = '\0';
         if (buffer[0] == '\0') continue;
+        /* The dashboard bridge escapes real newlines as \x01 so
+         * multi-line prose fits on one fgets-line. Restore them
+         * before the Interpreter sees the text. */
+        for (int i = 0; buffer[i]; i++) {
+            if (buffer[i] == '\x01') buffer[i] = '\n';
+        }
         the_interpretation interp = the_interpreter_listens(buffer);
         she_writes_a_json_interpretation(stdout, &interp);
     }

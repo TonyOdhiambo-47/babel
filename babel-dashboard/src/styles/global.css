@@ -140,15 +140,12 @@ textarea:focus, input:focus {
 }
 
 .shell.editor {
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr) minmax(320px, 1fr);
   grid-template-rows: 44px minmax(0, 1fr) 220px;
   grid-template-areas:
-    "bar    bar"
-    "center output"
-    "state  state";
-}
-.shell.editor .panel.voice {
-  display: none;
+    "bar    bar     bar"
+    "voice  center  output"
+    "state  state   state";
 }
 
 .panel {

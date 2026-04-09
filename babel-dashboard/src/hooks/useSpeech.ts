@@ -15,6 +15,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  maxAlternatives?: number;
   onresult: ((event: any) => void) | null;
   onerror: ((event: any) => void) | null;
   onend: (() => void) | null;
@@ -57,6 +58,10 @@ export function useSpeech(): SpeechApi {
   const silenceTimerRef = useRef<number | null>(null);
   const listenersRef = useRef(new Set<(text: string) => void>());
   const pendingRef = useRef('');
+  /* If the recogniser ends on its own (Chrome auto-stops after
+   * ~60s of silence), we want to restart it as long as the user
+   * hasn't explicitly pressed stop. */
+  const wantRunningRef = useRef(false);
 
   const scheduleSilence = useCallback(() => {
     if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
@@ -66,7 +71,7 @@ export function useSpeech(): SpeechApi {
         for (const l of listenersRef.current) l(text);
         pendingRef.current = '';
       }
-    }, 1500);
+    }, 800);
   }, []);
 
   const start = useCallback(() => {
@@ -76,6 +81,7 @@ export function useSpeech(): SpeechApi {
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = 'en-US';
+    rec.maxAlternatives = 1;
     rec.onresult = (event: any) => {
       let interimPart = '';
       let finalPart = '';
@@ -99,10 +105,31 @@ export function useSpeech(): SpeechApi {
       setError(event?.error ? String(event.error) : 'speech error');
     };
     rec.onend = () => {
-      setListening(false);
       recRef.current = null;
+      if (wantRunningRef.current) {
+        /* Chrome sometimes ends after a long silence. Restart
+         * transparently so the mic stays "open" until the user
+         * presses stop. */
+        try {
+          const next = new Rec();
+          next.continuous = true;
+          next.interimResults = true;
+          next.lang = 'en-US';
+          next.maxAlternatives = 1;
+          next.onresult = rec.onresult;
+          next.onerror = rec.onerror;
+          next.onend = rec.onend;
+          next.start();
+          recRef.current = next;
+          return;
+        } catch {
+          /* fall through to "listening false" below */
+        }
+      }
+      setListening(false);
     };
     try {
+      wantRunningRef.current = true;
       rec.start();
       recRef.current = rec;
       setListening(true);
@@ -113,6 +140,7 @@ export function useSpeech(): SpeechApi {
   }, [ctor, supported, scheduleSilence]);
 
   const stop = useCallback(() => {
+    wantRunningRef.current = false;
     if (silenceTimerRef.current) {
       window.clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
