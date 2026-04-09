@@ -1,0 +1,27 @@
+{
+  "name": "babel-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The living dashboard — a window into the mind of the Babel compiler.",
+  "scripts": {
+    "dev": "concurrently -k -n bridge,web -c magenta,cyan \"npm:dev:bridge\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:bridge": "node server/bridge.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
+    "ws": "^8.18.0"
+  }
+}

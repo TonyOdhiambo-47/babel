@@ -1,0 +1,315 @@
+/*
+ * Global reset + layout shell.
+ *
+ * The dashboard is a fixed four-panel grid. The grid is not
+ * responsive in a conventional sense — this is a desktop tool,
+ * and on smaller screens it simply scrolls. The design leans
+ * into that: every panel has a deliberate role, and none of them
+ * want to be squeezed.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  /* A faint vignette + grid — just enough texture to stop the
+   * background from feeling flat. Almost invisible. */
+  background-image:
+    radial-gradient(ellipse at center, rgba(100, 255, 218, 0.03) 0%, transparent 55%),
+    linear-gradient(to right, rgba(100, 255, 218, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(100, 255, 218, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 42px 42px, 42px 42px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-soft);
+  color: var(--text-tertiary);
+  box-shadow: none;
+}
+
+textarea, input {
+  font: inherit;
+  color: inherit;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  outline: none;
+}
+textarea:focus, input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary-soft);
+}
+
+::selection {
+  background: var(--accent-primary);
+  color: var(--bg-deep);
+}
+
+/* Custom scrollbars — dark, thin, quiet. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* The four-panel grid. The left column is narrower — it's a
+ * transcript, not a document. The center is the stage. The right
+ * is a tall slice. The bottom spans the full width. */
+.shell {
+  display: grid;
+  height: 100vh;
+  width: 100vw;
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr) minmax(320px, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr) 220px;
+  grid-template-areas:
+    "bar    bar     bar"
+    "voice  center  output"
+    "state  state   state";
+  gap: 10px;
+  padding: 10px;
+}
+
+.shell.presentation {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+  grid-template-rows: 44px minmax(0, 1fr) 0;
+  grid-template-areas:
+    "bar    bar     bar"
+    "voice  center  output"
+    "state  state   state";
+}
+.shell.presentation .panel.voice,
+.shell.presentation .panel.output,
+.shell.presentation .panel.state {
+  display: none;
+}
+.shell.presentation {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  grid-template-areas:
+    "bar    bar"
+    "center output";
+}
+.shell.presentation .panel.center {
+  grid-area: center;
+}
+.shell.presentation .panel.output {
+  display: block;
+  grid-area: output;
+}
+
+.shell.editor {
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr) 220px;
+  grid-template-areas:
+    "bar    bar"
+    "center output"
+    "state  state";
+}
+.shell.editor .panel.voice {
+  display: none;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.panel.voice  { grid-area: voice; }
+.panel.center { grid-area: center; }
+.panel.output { grid-area: output; }
+.panel.state  { grid-area: state; }
+
+/* The small header that sits above every panel — it tells you
+ * what the panel is, and provides one deliberate affordance. */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(to bottom, rgba(255,255,255,0.02), transparent);
+  flex-shrink: 0;
+}
+.panel-head .title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+.panel-head .sub {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+
+/* The top status bar — it spans the grid and shows mode, backend,
+ * connection state, and a quiet "Babel" wordmark. */
+.statusbar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.statusbar .brand {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-lg);
+  color: var(--accent-primary);
+  letter-spacing: 0.02em;
+}
+.statusbar .brand::after {
+  content: '·';
+  color: var(--text-dim);
+  margin: 0 10px;
+}
+.statusbar .tagline {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+.statusbar .spacer {
+  flex: 1;
+}
+.statusbar .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-family: var(--font-code);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+.statusbar .chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+}
+.statusbar .chip.ok .dot     { background: var(--accent-success); box-shadow: 0 0 8px var(--accent-success); }
+.statusbar .chip.bad .dot    { background: var(--accent-error); }
+.statusbar .chip.warn .dot   { background: var(--accent-warn); }
+
+.mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.mode-switch button {
+  border: 0;
+  border-radius: 0;
+  padding: 4px 12px;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  box-shadow: none;
+}
+.mode-switch button.active {
+  background: var(--accent-primary);
+  color: var(--bg-deep);
+  box-shadow: none;
+}
+.mode-switch button:hover {
+  color: var(--accent-primary);
+  box-shadow: none;
+}
+.mode-switch button.active:hover {
+  color: var(--bg-deep);
+}
+
+/* The one floating control — the mic toggle — sits in the corner
+ * so every mode keeps hands-free capture one keystroke away. */
+.mic-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 50;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-family: var(--font-code);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-elevated);
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+.mic-fab:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+.mic-fab.on {
+  color: var(--bg-deep);
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 32px -4px var(--accent-primary);
+  animation: pulse 2s ease-in-out infinite;
+}

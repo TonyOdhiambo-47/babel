@@ -1,0 +1,76 @@
+/*
+ * The dashboard's design tokens.
+ *
+ * The dashboard should feel like a spacecraft control panel —
+ * dark, precise, information-dense but not cluttered. The colour
+ * is pulled toward deep near-black with teal and warm gold
+ * accents. The only "display" typeface is the italic Instrument
+ * Serif, used sparingly for the title and for marked-up quotes
+ * inside the conversation overlay. Everything else is monospace
+ * (for code) or a sober grotesk (for labels).
+ */
+
+:root {
+  /* Surfaces — four stops from the bottom of the ocean upward. */
+  --bg-deep:      #070710;
+  --bg-panel:     #0e0e18;
+  --bg-elevated:  #141420;
+  --bg-hover:     #1a1a28;
+  --border:       #22223a;
+  --border-soft:  #1a1a2c;
+  --border-glow:  rgba(100, 255, 218, 0.24);
+
+  /* Accents — teal as the working colour, gold as the "she
+   * translated that for you" colour, green for confirmation,
+   * amber for errors. */
+  --accent-primary:    #64ffda;
+  --accent-secondary:  #ffd740;
+  --accent-tertiary:   #a68aff;
+  --accent-success:    #69f0ae;
+  --accent-error:      #ff6e6e;
+  --accent-warn:       #ffc046;
+
+  /* Translucent accent tints used for backgrounds and borders. */
+  --accent-primary-soft:   rgba(100, 255, 218, 0.10);
+  --accent-secondary-soft: rgba(255, 215, 64, 0.10);
+  --accent-error-soft:     rgba(255, 110, 110, 0.10);
+
+  /* Text — bright at the top for the live transcript,
+   * slightly softer for code, then two dim tiers. */
+  --text-primary:   #eef0f6;
+  --text-secondary: #9ea1b8;
+  --text-tertiary:  #5c5e78;
+  --text-dim:       #3a3c54;
+
+  /* Typography — JetBrains Mono for code, Inter for UI,
+   * Instrument Serif for display moments. */
+  --font-code:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ui:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Instrument Serif', Georgia, serif;
+
+  /* Size scale — spacecraft-dense but breathable. */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-md:   1.125rem;
+  --text-lg:   1.3125rem;
+  --text-xl:   1.75rem;
+  --text-2xl:  2.5rem;
+  --text-3xl:  3.75rem;
+
+  /* Radii and shadows. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-panel:    0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 0 0 1px var(--border);
+  --shadow-elevated: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+  --shadow-glow:     0 0 24px -6px rgba(100, 255, 218, 0.35);
+
+  /* Motion curves. Calm-fast — mechanical but not snappy. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:  cubic-bezier(0.7, 0, 0.84, 0);
+  --dur-fast: 140ms;
+  --dur-mid:  260ms;
+  --dur-slow: 420ms;
+}

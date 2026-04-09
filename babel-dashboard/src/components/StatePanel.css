@@ -1,0 +1,64 @@
+.state-body {
+  padding: 18px 22px;
+}
+.state-empty {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.state-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  animation: cardIn 0.32s var(--ease-out) both;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.state-card header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.state-kind {
+  font-family: var(--font-code);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-tertiary);
+}
+.state-name {
+  font-family: var(--font-code);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.state-summary {
+  font-family: var(--font-code);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.state-card.kind-number   { border-left: 2px solid var(--accent-primary);   }
+.state-card.kind-word     { border-left: 2px solid var(--accent-success);   }
+.state-card.kind-truth    { border-left: 2px solid var(--accent-warn);      }
+.state-card.kind-list     { border-left: 2px solid var(--accent-secondary); }
+.state-card.kind-recipe   { border-left: 2px solid var(--accent-tertiary);  }
+.state-card.kind-number .state-kind   { color: var(--accent-primary);   }
+.state-card.kind-word .state-kind     { color: var(--accent-success);   }
+.state-card.kind-truth .state-kind    { color: var(--accent-warn);      }
+.state-card.kind-list .state-kind     { color: var(--accent-secondary); }
+.state-card.kind-recipe .state-kind   { color: var(--accent-tertiary);  }
