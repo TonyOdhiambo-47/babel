@@ -3352,6 +3352,74 @@ static void she_resolves_the_uncertain(the_interpretation *interp) {
     interp->the_reconstructed_babel[rb] = '\0';
 }
 
+/* When the Interpreter is asked to speak in JSON — for the
+ * dashboard, which is a younger and more visual listener — she
+ * emits her interpretation as a single line of machine-readable
+ * text instead of the colourful block she shows a human. Each
+ * JSON line is self-contained and terminated with a newline, so
+ * the caller can read one line at a time and parse it. */
+static void she_writes_a_json_string(FILE *out, const char *s) {
+    fputc('"', out);
+    for (const char *c = s; *c; c++) {
+        unsigned char ch = (unsigned char)*c;
+        if (ch == '"' || ch == '\\') { fputc('\\', out); fputc(ch, out); }
+        else if (ch == '\n') fputs("\\n", out);
+        else if (ch == '\r') fputs("\\r", out);
+        else if (ch == '\t') fputs("\\t", out);
+        else if (ch < 0x20) fprintf(out, "\\u%04x", ch);
+        else fputc(ch, out);
+    }
+    fputc('"', out);
+}
+
+static const char *her_confidence_word(how_well_she_understood c) {
+    switch (c) {
+    case UNDERSTOOD_PERFECTLY: return "green";
+    case UNDERSTOOD_PROBABLY:  return "yellow";
+    case NEEDS_A_VALUE:        return "yellow";
+    default:                   return "red";
+    }
+}
+
+static void she_writes_a_json_interpretation(FILE *out, const the_interpretation *interp) {
+    fputs("{\"fragments\":[", out);
+    for (int i = 0; i < interp->how_many_fragments; i++) {
+        if (i > 0) fputc(',', out);
+        const an_interpretation *f = &interp->fragments[i];
+        fputs("{\"original\":", out);
+        she_writes_a_json_string(out, f->the_travelers_words);
+        fputs(",\"babel\":", out);
+        she_writes_a_json_string(out, f->the_babel_translation);
+        fputs(",\"confidence\":", out);
+        she_writes_a_json_string(out, her_confidence_word(f->her_confidence));
+        fputs(",\"reason\":", out);
+        she_writes_a_json_string(out, f->her_reason);
+        fputc('}', out);
+    }
+    fputs("],\"babel\":", out);
+    she_writes_a_json_string(out, interp->the_reconstructed_babel);
+    fputs(",\"hasYellow\":", out);
+    fputs(interp->has_yellow_slots ? "true" : "false", out);
+    fputs(",\"hasRed\":", out);
+    fputs(interp->has_red_slots ? "true" : "false", out);
+    fputs("}\n", out);
+    fflush(out);
+}
+
+/* The Interpreter's machine-mode: she reads loose English, one
+ * line at a time from stdin, and writes her interpretation as a
+ * JSON line to stdout. The dashboard uses this to keep up with a
+ * speaker in real time. */
+static void she_listens_in_json_mode(void) {
+    char buffer[8192];
+    while (fgets(buffer, sizeof(buffer), stdin)) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+        if (buffer[0] == '\0') continue;
+        the_interpretation interp = the_interpreter_listens(buffer);
+        she_writes_a_json_interpretation(stdout, &interp);
+    }
+}
+
 /* ================================================================
  * EPILOGUE: THE TOWER STANDS
  *
@@ -3464,12 +3532,16 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
     int the_scribe_is_called = 0;
     int the_scribe_speaks_python = 0;
     int the_interpreter_is_called = 0;
+    int the_interpreter_speaks_json = 0;
     const char *the_output_binary = "a.out";
     const char *the_output_python = NULL;
     int first_arg = 1;
     while (first_arg < the_count_of_arguments && the_arguments_themselves[first_arg][0] == '-') {
         if (strcmp(the_arguments_themselves[first_arg], "-i") == 0) {
             the_interpreter_is_called = 1;
+            first_arg++;
+        } else if (strcmp(the_arguments_themselves[first_arg], "--json-interpret") == 0) {
+            the_interpreter_speaks_json = 1;
             first_arg++;
         } else if (strcmp(the_arguments_themselves[first_arg], "-c") == 0) {
             the_scribe_is_called = 1;
@@ -3554,6 +3626,10 @@ int main(int the_count_of_arguments, char **the_arguments_themselves) {
         return 0;
     }
 
+    if (the_interpreter_speaks_json) {
+        she_listens_in_json_mode();
+        return 0;
+    }
     if (the_interpreter_is_called)
         the_conversation_begins_with_an_interpreter();
     else
