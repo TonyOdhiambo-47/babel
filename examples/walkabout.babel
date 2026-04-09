@@ -1,0 +1,47 @@
+Let there be a list called "numbers" that begins empty.
+Remember 1 as numbers.
+Remember 2 as numbers.
+Remember 3 as numbers.
+Remember 4 as numbers.
+Remember 5 as numbers.
+Remember 6 as numbers.
+Remember 7 as numbers.
+Remember 8 as numbers.
+
+Say "Walking through the list in order:".
+For every n in numbers, do the following:
+    Print n.
+
+Let there be a list called "evens" that begins empty.
+For every n in numbers, do the following:
+    If n is divisible by 2, remember n as evens.
+
+Say "The even ones:".
+Print evens, separated by ", ".
+
+Say "A few questions of belonging:".
+If numbers contains 5, do the following:
+    Say "five is here".
+Otherwise, do the following:
+    Say "no five".
+
+If numbers contains 99, do the following:
+    Say "ninety-nine is here".
+Otherwise, do the following:
+    Say "no ninety-nine".
+
+# Expected output:
+# Walking through the list in order:
+# 1
+# 2
+# 3
+# 4
+# 5
+# 6
+# 7
+# 8
+# The even ones:
+# 2, 4, 6, 8
+# A few questions of belonging:
+# five is here
+# no ninety-nine

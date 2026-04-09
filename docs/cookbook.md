@@ -21,25 +21,35 @@ Let there be a number called "avg" that equals the sum of xs divided by the leng
 Print avg.
 ```
 
-## Filtering into a new list
-
-Because Babel has no `filter` built-in and no way to iterate a list by
-position, the idiom is to build the filtered list by running a counted
-loop over the range you care about:
+## Walking a list
 
 ```babel
-Let there be a list called "evens" that begins empty.
+Let there be a list called "primes" that begins empty.
+Remember 2 as primes.
+Remember 3 as primes.
+Remember 5 as primes.
+
+For every p in primes, do the following:
+    Print p.
+```
+
+## Filtering into a new list
+
+```babel
+Let there be a list called "xs" that begins empty.
 For every n from 1 to 20, do the following:
+    Remember n as xs.
+
+Let there be a list called "evens" that begins empty.
+For every n in xs, do the following:
     If n is divisible by 2, remember n as evens.
+
 Print evens, separated by ", ".   # 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
 ```
 
-## Finding a maximum (within a known range)
+## Finding a maximum
 
-Babel has no positional access to list elements, so the usual "walk the
-list and keep a running max" is awkward. When your data is built from a
-range of integers, the cleanest trick is to run the range in order and
-let later values overwrite earlier ones:
+Walk the list and keep a running maximum:
 
 ```babel
 Let there be a list called "numbers" that begins empty.
@@ -49,8 +59,9 @@ Remember 99 as numbers.
 Remember 42 as numbers.
 
 Let there be a number called "biggest" that equals 0.
-For every candidate from 1 to 100, do the following:
-    If numbers contains candidate, set "biggest" to candidate.
+For every n in numbers, do the following:
+    If n is greater than biggest, set "biggest" to n.
+
 Print biggest.   # 99
 ```
 
@@ -113,6 +124,21 @@ For every i from 1 to 100, do the following:
 ```
 
 Output: `1 2 3 4 5 6` (each on its own line).
+
+## Several actions inside one branch
+
+When a branch of an `If` needs more than one statement, use the block
+form — `do the following:` + an indented body, the same shape as a
+loop or a recipe:
+
+```babel
+If score is greater than 90, do the following:
+    Say "excellent".
+    Set rank to rank plus 1.
+Otherwise, do the following:
+    Say "keep going".
+    Set attempts to attempts plus 1.
+```
 
 ## A compound condition by nesting
 

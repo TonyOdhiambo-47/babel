@@ -125,6 +125,7 @@ typedef enum {
     WORD_THAN,          /* the object of comparison         */
     WORD_DIVISIBLE,     /* the question of clean division   */
     WORD_CONTAINS,      /* the question of belonging        */
+    WORD_IN,            /* the small word of walking-through */
 
     /* The measures */
     WORD_EMPTY,         /* the void before creation         */
@@ -341,6 +342,7 @@ static the_naming the_known_words[] = {
     {"than",      WORD_THAN},      {"Than",      WORD_THAN},
     {"divisible", WORD_DIVISIBLE}, {"Divisible", WORD_DIVISIBLE},
     {"contains",  WORD_CONTAINS},  {"Contains",  WORD_CONTAINS},
+    {"in",        WORD_IN},        {"In",        WORD_IN},
 
     {"empty",     WORD_EMPTY},     {"Empty",     WORD_EMPTY},
     {"length",    WORD_LENGTH},    {"Length",    WORD_LENGTH},
@@ -581,6 +583,11 @@ struct the_room {
     char the_counter_name[THE_LIMIT_OF_TEXT];
     the_room *the_beginning;
     the_room *the_destination;
+    /* When is_foreach is 1, the for-loop walks the elements of the
+     * list whose name lives in the_text, instead of counting from
+     * the_beginning up to the_destination. The counter bound to
+     * the_counter_name then holds each element in turn. */
+    int is_foreach;
 
     /* For function definitions and calls */
     char  the_recipe_name[THE_LIMIT_OF_TEXT];
@@ -1075,18 +1082,39 @@ static the_room* the_parser_reads_a_statement(void) {
         return r;
     }
 
-    /* "If COND, STMT." [next line] "Otherwise, STMT." */
+    /* "If COND, STMT." or
+     * "If COND, do the following:" + indented block
+     * optionally followed by
+     * "Otherwise, STMT." or
+     * "Otherwise, do the following:" + indented block */
     if (he_accepts(WORD_IF)) {
         the_room *cond = the_parser_reads_a_condition();
         he_demands(WORD_COMMA, "a comma after the condition");
-        the_room *then_branch = the_parser_reads_a_statement();
+        the_room *then_branch = NULL;
+        if (what_he_sees()->what_kind == WORD_DO) {
+            he_takes_a_step();
+            he_demands(WORD_THE,       "the word \"the\"");
+            he_demands(WORD_FOLLOWING, "the word \"following\"");
+            he_demands(WORD_COLON,     "a colon");
+            then_branch = the_parser_reads_a_block();
+        } else {
+            then_branch = the_parser_reads_a_statement();
+        }
         the_room *else_branch = NULL;
         /* tentatively look past blank lines for an Otherwise */
         int saved = the_one_who_builds.where_he_stands;
         he_skips_blank_lines();
         if (he_accepts(WORD_OTHERWISE)) {
             he_demands(WORD_COMMA, "a comma after \"Otherwise\"");
-            else_branch = the_parser_reads_a_statement();
+            if (what_he_sees()->what_kind == WORD_DO) {
+                he_takes_a_step();
+                he_demands(WORD_THE,       "the word \"the\"");
+                he_demands(WORD_FOLLOWING, "the word \"following\"");
+                he_demands(WORD_COLON,     "a colon");
+                else_branch = the_parser_reads_a_block();
+            } else {
+                else_branch = the_parser_reads_a_statement();
+            }
         } else {
             the_one_who_builds.where_he_stands = saved;
         }
@@ -1097,7 +1125,9 @@ static the_room* the_parser_reads_a_statement(void) {
         return r;
     }
 
-    /* "For every NAME from EXPR to EXPR, do the following:" + block */
+    /* "For every NAME from EXPR to EXPR, do the following:" + block
+     * or
+     * "For every NAME in LIST, do the following:" + block */
     if (he_accepts(WORD_FOR)) {
         he_demands(WORD_EVERY, "the word \"every\"");
         the_word *nm = what_he_sees();
@@ -1109,20 +1139,39 @@ static the_room* the_parser_reads_a_statement(void) {
             the_tower_apologizes(line, "After \"every\" I expected the name of a counter.");
         }
         he_now_knows(counter);
-        he_demands(WORD_FROM, "the word \"from\"");
-        the_room *start = the_parser_reads_an_expression();
-        he_demands(WORD_TO, "the word \"to\"");
-        the_room *end = the_parser_reads_an_expression();
-        he_demands(WORD_COMMA, "a comma after the loop range");
+
+        the_room *r = a_new_room(ROOM_FOR_LOOP, line);
+        strncpy(r->the_counter_name, counter, THE_LIMIT_OF_TEXT - 1);
+
+        if (he_accepts(WORD_IN)) {
+            /* The walking-through form: bind the counter to each
+             * element of the named list in turn. */
+            char listname[THE_LIMIT_OF_TEXT];
+            int parts = he_finds_a_known_name(listname);
+            if (parts == 0) {
+                the_word *bad = what_he_sees();
+                the_tower_apologizes(line,
+                    "After \"in\" I expected the name of a list, but found \"%s\".",
+                    bad->the_letters);
+            }
+            for (int p = 0; p < parts; p++) he_takes_a_step();
+            r->is_foreach = 1;
+            strncpy(r->the_text, listname, THE_LIMIT_OF_TEXT - 1);
+        } else {
+            he_demands(WORD_FROM, "the word \"from\" or \"in\"");
+            the_room *start = the_parser_reads_an_expression();
+            he_demands(WORD_TO, "the word \"to\"");
+            the_room *end = the_parser_reads_an_expression();
+            r->the_beginning = start;
+            r->the_destination = end;
+        }
+
+        he_demands(WORD_COMMA, "a comma after the loop header");
         he_demands(WORD_DO,        "the word \"do\"");
         he_demands(WORD_THE,       "the word \"the\"");
         he_demands(WORD_FOLLOWING, "the word \"following\"");
         he_demands(WORD_COLON,     "a colon");
         the_room *body = the_parser_reads_a_block();
-        the_room *r = a_new_room(ROOM_FOR_LOOP, line);
-        strncpy(r->the_counter_name, counter, THE_LIMIT_OF_TEXT - 1);
-        r->the_beginning = start;
-        r->the_destination = end;
         r->the_left = body;
         strncpy(the_one_who_builds.the_last_name, counter, THE_LIMIT_OF_TEXT - 1);
         return r;
@@ -1664,6 +1713,39 @@ static the_thing* the_evaluator_enters(the_room *room, the_registry *where_she_i
      * starting place to a destination, doing the same work at
      * every step it takes. */
     case ROOM_FOR_LOOP: {
+        /* The walking-through form: bind the counter to each element
+         * of the list in turn, copying its fields into a stable slot
+         * so the child registry's name keeps pointing at the right
+         * thing even across the per-iteration mercy of forgetting. */
+        if (room->is_foreach) {
+            the_thing *list = the_registry_recalls(where_she_is, room->the_text);
+            if (!list || list->what_it_is != THING_LIST)
+                the_tower_apologizes(room->which_line,
+                    "I wanted a list to walk through, but \"%s\" is not a list.",
+                    room->the_text);
+            the_registry *child = a_fresh_registry(where_she_is);
+            the_thing *counter = a_new_number(0);
+            the_registry_writes(child, room->the_counter_name, counter);
+            int things_mark = how_many_things_so_far;
+            int registries_mark = how_many_registries_so_far;
+            int names_mark = child->how_many_names;
+            int total = list->how_many_elements;
+            for (int i = 0; i < total; i++) {
+                *counter = *list->its_elements[i];
+                the_room *body = room->the_left;
+                int stopped = 0;
+                for (int s = 0; s < body->how_many_rooms_within; s++) {
+                    the_room *st = body->the_rooms_within[s];
+                    if (st->what_kind == ROOM_STOP) { stopped = 1; break; }
+                    the_evaluator_enters(st, child);
+                }
+                how_many_things_so_far = things_mark;
+                how_many_registries_so_far = registries_mark;
+                child->how_many_names = names_mark;
+                if (stopped) break;
+            }
+            return a_new_nothing();
+        }
         the_thing *start = the_evaluator_enters(room->the_beginning, where_she_is);
         the_thing *end   = the_evaluator_enters(room->the_destination, where_she_is);
         long lo = (long)a_number_or_apologies(start, room->which_line);
@@ -1942,6 +2024,17 @@ static void the_scribe_renders_an_expression(FILE *out, the_room *r) {
         } else if (strcmp(op, "ndiv") == 0) {
             fputs("(fmod(", out); the_scribe_renders_an_expression(out, r->the_left);
             fputs(", ", out); the_scribe_renders_an_expression(out, r->the_right); fputs(") != 0)", out);
+        } else if (strcmp(op, "contains") == 0) {
+            /* In this younger, sharper tongue the Scribe can only
+             * ask the question of a list of numbers. */
+            if (!r->the_left || r->the_left->what_kind != ROOM_VARIABLE)
+                the_tower_apologizes(r->which_line,
+                    "The Scribe can only ask \"contains\" of a named list.");
+            fputs("babel_contains(&", out);
+            the_scribe_renders_a_name(out, "v_", r->the_left->the_text);
+            fputs(", ", out);
+            the_scribe_renders_an_expression(out, r->the_right);
+            fputs(")", out);
         } else {
             the_tower_apologizes(r->which_line, "The Scribe doesn't yet know how to write \"%s\" in C.", op);
         }
@@ -2096,6 +2189,31 @@ static void the_scribe_renders_a_statement(FILE *out, the_room *r, int depth) {
     }
     case ROOM_FOR_LOOP: {
         the_scribe_writes_down(r->the_counter_name, CTY_DOUBLE);
+        if (r->is_foreach) {
+            /* Walk the elements of a named list. The C backend only
+             * knows lists of numbers, so the counter is a double. */
+            the_scribe_indents(out, depth);
+            fputs("for (int ", out);
+            the_scribe_renders_a_name(out, "i_", r->the_counter_name);
+            fputs(" = 0; ", out);
+            the_scribe_renders_a_name(out, "i_", r->the_counter_name);
+            fputs(" < ", out);
+            the_scribe_renders_a_name(out, "v_", r->the_text);
+            fputs(".n; ", out);
+            the_scribe_renders_a_name(out, "i_", r->the_counter_name);
+            fputs("++) {\n", out);
+            the_scribe_indents(out, depth + 1);
+            fputs("double ", out);
+            the_scribe_renders_a_name(out, "v_", r->the_counter_name);
+            fputs(" = ", out);
+            the_scribe_renders_a_name(out, "v_", r->the_text);
+            fputs(".data[", out);
+            the_scribe_renders_a_name(out, "i_", r->the_counter_name);
+            fputs("];\n", out);
+            the_scribe_renders_a_block(out, r->the_left, depth + 1);
+            the_scribe_indents(out, depth); fputs("}\n", out);
+            return;
+        }
         the_scribe_indents(out, depth);
         fputs("for (long ", out);
         the_scribe_renders_a_name(out, "i_", r->the_counter_name);
@@ -2218,6 +2336,10 @@ static int the_scribe_compiles(the_room *top, const char *output_path) {
         "}\n"
         "static void babel_print_word(const char *s) {\n"
         "    printf(\"%s\\n\", s ? s : \"\");\n"
+        "}\n"
+        "static int babel_contains(babel_list *l, double v) {\n"
+        "    for (int i = 0; i < l->n; i++) if (l->data[i] == v) return 1;\n"
+        "    return 0;\n"
         "}\n"
         "static int babel_words_equal(const char *a, const char *b) {\n"
         "    if (!a || !b) return a == b;\n"
@@ -2356,6 +2478,14 @@ static void the_scribe_renders_python_expression(FILE *out, the_room *r) {
             fputs(") != 0)", out);
             return;
         }
+        if (strcmp(op, "contains") == 0) {
+            fputs("(", out);
+            the_scribe_renders_python_expression(out, r->the_right);
+            fputs(" in ", out);
+            the_scribe_renders_python_expression(out, r->the_left);
+            fputs(")", out);
+            return;
+        }
         the_tower_apologizes(r->which_line, "The Scribe doesn't yet know how to write \"%s\" in Python.", op);
         return;
     }
@@ -2475,6 +2605,15 @@ static void the_scribe_renders_python_statement(FILE *out, the_room *r, int dept
         return;
     case ROOM_FOR_LOOP:
         the_scribe_renders_python_indent(out, depth);
+        if (r->is_foreach) {
+            fputs("for ", out);
+            the_scribe_renders_python_name(out, r->the_counter_name);
+            fputs(" in ", out);
+            the_scribe_renders_python_name(out, r->the_text);
+            fputs(":\n", out);
+            the_scribe_renders_python_block(out, r->the_left, depth + 1);
+            return;
+        }
         fputs("for ", out);
         the_scribe_renders_python_name(out, r->the_counter_name);
         fputs(" in range(int(", out);

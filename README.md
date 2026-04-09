@@ -92,6 +92,7 @@ Full docs live in the `docs/` folder:
 - `examples/primes.babel` — the sieve above
 - `examples/primality.babel` — a recipe that returns a truth
 - `examples/average.babel` — the sum and length of a list
+- `examples/walkabout.babel` — walking a list with `For every x in LIST`
 - `examples/multiplication_table.babel` — nested loops that build a grid
 - `examples/gcd.babel` — Euclid's algorithm as a recursive recipe
 - `examples/power.babel` — recursive exponentiation

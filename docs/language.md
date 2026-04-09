@@ -292,8 +292,8 @@ The `contains` operator asks whether a list contains a value:
 If xs contains 2, say "yes".
 ```
 
-Note: `contains` is supported by the default interpreter. The native C
-backend and the Python transcriber do not yet handle it.
+`contains` is supported by all three backends — the interpreter, the
+native C binary, and the Python transcription.
 
 ---
 
@@ -363,14 +363,28 @@ Otherwise, STATEMENT.
 ```
 
 The `Otherwise` clause is optional, and it always attaches to the
-immediately preceding `If`. The statement after a condition is a **single
-statement** — Babel has no `{ ... }`-style block form for `If`. If you
-need multiple actions in a branch, use a recipe, or use nested structures.
+immediately preceding `If`.
 
 ```babel
 If x is greater than 0, print "positive".
 Otherwise, print "zero or negative".
 ```
+
+If a branch needs several actions, use the block form — the same
+`do the following:` + indented body shape that loops and recipes use:
+
+```babel
+If x is greater than 0, do the following:
+    print "positive".
+    print "good news".
+Otherwise, do the following:
+    print "zero or negative".
+    print "bad news".
+```
+
+Single-statement and block forms can be mixed freely — the `then` branch
+can be a block while the `Otherwise` branch is a single statement, or
+vice versa.
 
 Chained cases are written with `Otherwise, if ...`:
 
@@ -410,6 +424,31 @@ For every row from 1 to 3, do the following:
     For every col from 1 to 3, do the following:
         Print row times col.
 ```
+
+### Walking through a list
+
+```babel
+For every ELEMENT in LIST, do the following:
+    BODY
+```
+
+This form binds `ELEMENT` to each value of `LIST` in turn. The element
+only exists for the duration of the loop, the same way a counter does.
+
+```babel
+Let there be a list called "primes" that begins empty.
+Remember 2 as primes.
+Remember 3 as primes.
+Remember 5 as primes.
+
+For every p in primes, do the following:
+    Print p.
+```
+
+Lists of numbers and lists of words are both walkable. The walking form
+is supported by all three backends, with one limitation: the native C
+backend only knows lists of numbers, so walking a list of words is an
+interpreter-and-Python feature.
 
 ### While loop
 
@@ -474,10 +513,10 @@ for "the 3rd element of this list". The operations you have are:
 - `the sum of LIST` — the numeric total
 - `LIST contains EXPR` — membership
 - `Print LIST, separated by ...` — printing all of it
-- Iterating (indirectly): there is no `for each` over a list. `For every`
-  is a counted loop over a numeric range. To walk a list, you typically
-  build it in the same shape as the range you'll iterate, or you rephrase
-  your algorithm to not need random access.
+- `For every X in LIST, do the following:` — walk the elements in order
+
+There is still no positional indexing. If you need "the 3rd element" you
+either rephrase the algorithm, or walk the list and keep a counter.
 
 See the [Cookbook](cookbook.md) for the usual workarounds.
 
@@ -618,8 +657,9 @@ $ ./myprog
 Babel writes a C file, hands it to `cc -O3`, and produces a native
 binary. The binary runs at the speed of optimized C.
 
-Note: the native backend does not yet support the `contains` operator.
-If you need `contains`, use the interpreter.
+The native backend supports `contains` on lists of numbers, and walks
+number lists with `For every X in LIST`. Lists of words are an
+interpreter-and-Python feature.
 
 ### Transcribing to Python
 
@@ -634,8 +674,7 @@ drop the result into a larger Python project.
 
 Limitations: Python's division always yields a float, so programs that
 rely on "integer-looking" output after `divided by` may differ by a
-`.0` from the interpreter's output. And, as with the C backend, the
-Python transcriber does not handle `contains`.
+`.0` from the interpreter's output.
 
 ### The REPL
 

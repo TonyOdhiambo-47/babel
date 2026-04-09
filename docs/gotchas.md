@@ -16,18 +16,12 @@ can do with a list are:
 - read its length (`the length of xs`)
 - read its total (`the sum of xs`)
 - ask whether it contains a value (`xs contains 7`)
+- walk its elements with `For every x in xs, do the following:`
 - print the whole thing
 
 If your algorithm needs positional access to a list, you will have to
 rephrase it. The [Cookbook](cookbook.md#finding-a-maximum-within-a-known-range)
 has the usual workarounds.
-
-### No `for each` over a list
-
-`For every i from A to B` is a **counted loop over a numeric range**. It
-does not iterate over the elements of a list. If you want to walk a
-list, you typically build your program so the interesting data lives in
-a range of integers, or you check membership with `contains`.
 
 ### No `and` / `or` in conditions
 
@@ -100,38 +94,21 @@ Use underscores.
 You cannot name an argument `a`, because `a` is a keyword. `gcd with a
 and b` will fail to parse. Use different letters: `gcd with x and y`.
 
-### `If` only takes a single statement per branch
-
-```babel
-If x is greater than 0, STATEMENT.
-Otherwise, STATEMENT.
-```
-
-There is no `{ ... }` or indented block form for the body of an `If`.
-If you need multiple actions, move them into a recipe and call the
-recipe from the branch:
-
-```babel
-To handle_positive, do the following:
-    Say "positive".
-    Set counter to counter plus 1.
-
-If x is greater than 0, handle_positive.
-```
-
 ### The Interpreter, the C backend, and the Python transcriber are not equal
 
 The default interpreter has the most features. The other two backends
-lag behind:
+are closer to parity now, but still lag on a few things:
 
-- **Native C backend** (`-c`): does not support `contains`.
-- **Python transcription** (`-p`): does not support `contains`; also,
-  Python's division always yields a float, so programs that use
-  `divided by` on integer values will print `5.0` where the interpreter
-  would print `5`.
+- **Native C backend** (`-c`): lists of words are not supported —
+  `babel_list` is backed by `double`, so you can only `Remember`
+  numbers into a list in C. The interpreter and the Python transcription
+  happily mix word lists and number lists.
+- **Python transcription** (`-p`): Python's division always yields a
+  float, so programs that use `divided by` on integer values will print
+  `5.0` where the interpreter would print `5`.
 
-If you want your program to be portable across all three, avoid
-`contains` and avoid printing the result of `divided by` directly.
+`contains` and `For every x in LIST` are supported by all three
+backends.
 
 ### Deep recursion can blow the C stack
 

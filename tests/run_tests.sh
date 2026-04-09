@@ -115,6 +115,61 @@ check "a recipe with one argument" \
 Print double with 21.' \
     '42'
 
+check "walking through a list" \
+    'Let there be a list called "xs" that begins empty.
+Remember 10 as xs.
+Remember 20 as xs.
+Remember 30 as xs.
+For every x in xs, do the following:
+    Print x.' \
+    '10
+20
+30'
+
+check "walking through a list of words" \
+    'Let there be a list called "names" that begins empty.
+Remember "alice" as names.
+Remember "bob" as names.
+For every n in names, do the following:
+    Print n.' \
+    'alice
+bob'
+
+check "contains finds what is there" \
+    'Let there be a list called "xs" that begins empty.
+Remember 2 as xs.
+Remember 4 as xs.
+Remember 6 as xs.
+If xs contains 4, print "yes".
+Otherwise, print "no".' \
+    'yes'
+
+check "contains does not find what is missing" \
+    'Let there be a list called "xs" that begins empty.
+Remember 2 as xs.
+Remember 4 as xs.
+If xs contains 5, print "yes".
+Otherwise, print "no".' \
+    'no'
+
+check "a block if with multiple statements" \
+    'Let there be a number called "x" that equals 10.
+If x is greater than 5, do the following:
+    Print "big".
+    Print "really big".' \
+    'big
+really big'
+
+check "a block if with a block otherwise" \
+    'Let there be a number called "x" that equals 1.
+If x is greater than 5, do the following:
+    Print "big".
+Otherwise, do the following:
+    Print "small".
+    Print "really small".' \
+    'small
+really small'
+
 echo
 echo "and now the longer scrolls in examples/"
 echo
@@ -142,7 +197,7 @@ echo "and now the Scribe's Python transcriptions"
 echo
 
 if command -v python3 >/dev/null 2>&1; then
-    for e in hello fizzbuzz primes factorial fibonacci poetry; do
+    for e in hello fizzbuzz primes factorial fibonacci poetry walkabout; do
         expected=$(./babel "examples/$e.babel" 2>&1 || true)
         actual=$(./babel -p "examples/$e.babel" 2>/dev/null | python3 2>&1 || true)
         if [ "$expected" = "$actual" ]; then
